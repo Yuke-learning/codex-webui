@@ -103,12 +103,15 @@ function renderThreadList() {
   const scrollTop = elements.list.scrollTop;
   elements.list.replaceChildren();
 
-  for (const group of groupThreads(state.threads)) {
+  for (const [groupIndex, group] of groupThreads(state.threads).entries()) {
     const section = document.createElement("section");
     const containsSelectedThread = group.threads.some((thread) => thread.id === state.selectedId);
     const collapsed = state.collapsedProjectKeys.has(group.key) && !containsSelectedThread;
+    const isUngrouped = group.key === "other";
+    const rowsId = `project-threads-${groupIndex}`;
     if (containsSelectedThread) state.collapsedProjectKeys.delete(group.key);
-    section.className = `project-group${collapsed ? " is-collapsed" : ""}`;
+    section.className = `project-group${collapsed ? " is-collapsed" : ""}${isUngrouped ? " is-ungrouped" : ""}`;
+    section.setAttribute("aria-label", `${group.name}，${group.threads.length} 个对话`);
 
     const heading = document.createElement("div");
     heading.className = "project-heading";
@@ -116,33 +119,38 @@ function renderThreadList() {
     toggle.className = "project-toggle";
     toggle.type = "button";
     toggle.setAttribute("aria-expanded", String(!collapsed));
-    toggle.title = `${collapsed ? "展开" : "收起"}${group.name}`;
+    toggle.setAttribute("aria-controls", rowsId);
+    toggle.title = `${collapsed ? "展开" : "收起"} ${group.name}${isUngrouped ? "" : `\n${group.description}`}`;
     toggle.addEventListener("click", () => toggleProjectGroup(group.key));
 
+    const mark = document.createElement("span");
+    mark.className = "project-mark";
+    mark.setAttribute("aria-hidden", "true");
     const chevron = document.createElement("span");
     chevron.className = "project-chevron";
     chevron.setAttribute("aria-hidden", "true");
-    chevron.textContent = ">";
     const title = document.createElement("div");
     title.className = "project-heading-text";
     const name = document.createElement("strong");
     name.textContent = group.name;
     const description = document.createElement("span");
+    description.className = "project-path";
     description.textContent = group.description;
     const count = document.createElement("span");
     count.className = "project-count";
     count.textContent = String(group.threads.length);
+    count.setAttribute("aria-label", `${group.threads.length} 个对话`);
     title.append(name, description);
-    toggle.append(chevron, title, count);
+    toggle.append(mark, chevron, title, count);
     heading.append(toggle);
 
     section.append(heading);
-    if (!collapsed) {
-      const rows = document.createElement("div");
-      rows.className = "project-threads";
-      for (const thread of group.threads) rows.append(threadRow(thread));
-      section.append(rows);
-    }
+    const rows = document.createElement("div");
+    rows.id = rowsId;
+    rows.className = "project-threads";
+    rows.hidden = collapsed;
+    for (const thread of group.threads) rows.append(threadRow(thread));
+    section.append(rows);
     elements.list.append(section);
   }
 
