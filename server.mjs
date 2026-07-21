@@ -18,6 +18,7 @@ const eventClients = new Set();
 const staticFiles = new Map([
   ["/", { file: "index.html", type: "text/html; charset=utf-8" }],
   ["/app.js", { file: "app.js", type: "text/javascript; charset=utf-8" }],
+  ["/live-activity.js", { file: "live-activity.js", type: "text/javascript; charset=utf-8" }],
   ["/refresh-policy.js", { file: "refresh-policy.js", type: "text/javascript; charset=utf-8" }],
   ["/transcript.js", { file: "transcript.js", type: "text/javascript; charset=utf-8" }],
   ["/styles.css", { file: "styles.css", type: "text/css; charset=utf-8" }],

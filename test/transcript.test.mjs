@@ -3,7 +3,7 @@ import test from "node:test";
 
 import { parseAutomationEnvelope, toTranscript } from "../src/public/transcript.js";
 
-test("keeps native user, agent, and command execution items in the transcript", () => {
+test("keeps native user, agent, and execution items in the transcript", () => {
   const transcript = toTranscript({
     turns: [{
       items: [
@@ -17,9 +17,25 @@ test("keeps native user, agent, and command execution items in the transcript", 
   assert.deepEqual(transcript.messages, [
     { role: "user", label: "你", text: "检查状态" },
     { role: "assistant", label: "Codex", text: "正在检查。" },
-    { role: "tool", label: "终端命令", text: "git status --short" },
+    { role: "activity", label: "已运行命令", text: "git status --short" },
   ]);
   assert.deepEqual(transcript.automationEvents, []);
+});
+
+test("renders commentary progress without confusing it with the final answer", () => {
+  const transcript = toTranscript({
+    turns: [{
+      items: [
+        { type: "agentMessage", phase: "commentary", text: "正在读取文件。" },
+        { type: "agentMessage", phase: "final", text: "读取完成。" },
+      ],
+    }],
+  });
+
+  assert.deepEqual(transcript.messages, [
+    { role: "activity", label: "Codex 正在执行", text: "正在读取文件。" },
+    { role: "assistant", label: "Codex", text: "读取完成。" },
+  ]);
 });
 
 test("moves exact heartbeat envelopes into the automation audit trail", () => {

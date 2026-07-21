@@ -65,10 +65,10 @@ button { cursor: pointer; }
 .sidebar-content { display: flex; flex: 1; flex-direction: column; min-height: 0; gap: 8px; overflow: hidden; }
 .thread-list { display: flex; flex: 1; flex-direction: column; gap: 13px; min-width: 0; max-width: 100%; min-height: 0; overflow-x: hidden; overflow-y: auto; overscroll-behavior: contain; padding: 2px 2px 18px; }
 .project-group { display: grid; min-width: 0; max-width: 100%; gap: 6px; }
-.project-heading { position: sticky; z-index: 1; top: 0; min-width: 0; max-width: 100%; padding-top: 2px; background: var(--nav-sidebar-bg); }
-.project-toggle { display: grid; grid-template-columns: 15px 9px minmax(0, 1fr) auto; align-items: center; width: 100%; min-width: 0; max-width: 100%; min-height: 42px; gap: 8px; padding: 8px 9px; border: 1px solid var(--nav-project-border); border-left: 3px solid var(--nav-project-accent); border-radius: 6px; background: var(--nav-project-bg); color: var(--nav-project-text); text-align: left; transition: background .12s ease, border-color .12s ease; }
-.project-toggle:hover { background: var(--nav-project-hover); border-color: var(--nav-project-accent); color: var(--text); }
-.project-toggle:focus-visible { outline: 2px solid var(--nav-project-accent); outline-offset: 2px; }
+.project-heading { position: sticky; z-index: 1; top: 0; display: grid; grid-template-columns: 15px 9px minmax(0, 1fr) auto; align-items: center; min-width: 0; max-width: 100%; min-height: 42px; gap: 8px; padding: 8px 9px; border: 1px solid var(--nav-project-border); border-left: 3px solid var(--nav-project-accent); border-radius: 6px; background: var(--nav-project-bg); color: var(--nav-project-text); transition: background .12s ease, border-color .12s ease; }
+.project-heading:hover { background: var(--nav-project-hover); border-color: var(--nav-project-accent); color: var(--text); }
+.project-name-toggle { width: 100%; min-width: 0; padding: 0; border: 0; background: transparent; color: inherit; text-align: left; }
+.project-name-toggle:focus-visible { outline: 2px solid var(--nav-project-accent); outline-offset: 3px; }
 .project-mark { position: relative; width: 14px; height: 10px; margin-top: 2px; border: 1px solid currentColor; border-radius: 2px; color: var(--nav-project-accent); }
 .project-mark::before { position: absolute; top: -4px; left: 1px; width: 6px; height: 3px; border: 1px solid currentColor; border-bottom: 0; border-radius: 2px 2px 0 0; content: ""; }
 .project-chevron { width: 7px; height: 7px; border-right: 1px solid currentColor; border-bottom: 1px solid currentColor; color: var(--dim); transform: rotate(45deg); transition: transform .14s ease; }
@@ -85,7 +85,7 @@ button { cursor: pointer; }
 .thread-row-title { overflow: hidden; font-size: 13px; font-weight: 650; text-overflow: ellipsis; white-space: nowrap; }
 .thread-row.selected .thread-row-title { font-weight: 750; }
 .thread-row-meta { display: flex; gap: 7px; align-items: center; margin-top: 5px; color: var(--dim); font-size: 11px; }
-.project-group.is-ungrouped .project-toggle { border-style: dashed; border-left-color: var(--nav-ungrouped-accent); background: transparent; color: var(--muted); }
+.project-group.is-ungrouped .project-heading { border-style: dashed; border-left-color: var(--nav-ungrouped-accent); background: transparent; color: var(--muted); }
 .project-group.is-ungrouped .project-mark { width: 8px; height: 8px; margin-left: 3px; border-radius: 50%; color: var(--nav-ungrouped-accent); }
 .project-group.is-ungrouped .project-mark::before { display: none; }
 .project-group.is-ungrouped .project-threads { border-left-style: dashed; }
@@ -114,8 +114,13 @@ button { cursor: pointer; }
 .message.user { align-self: flex-end; max-width: 80%; background: var(--user); }
 .message.assistant { background: var(--assistant); }
 .message.tool { color: var(--muted); background: #15181d; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 12px; }
+.message.activity { border-left: 3px solid var(--accent); background: var(--panel); color: var(--muted); font-size: 13px; }
 .message-label { display: block; margin-bottom: 7px; color: var(--dim); font-size: 11px; font-weight: 750; letter-spacing: .08em; text-transform: uppercase; }
 .empty-messages { color: var(--muted); text-align: center; padding: 48px 0; }
+.live-activity { display: flex; align-items: flex-start; gap: 10px; max-width: 880px; margin: 18px auto 0; padding: 12px 14px; border: 1px solid var(--line); border-left: 3px solid var(--accent); border-radius: 8px; background: var(--panel); color: var(--muted); }
+.live-activity-indicator { flex: 0 0 auto; width: 8px; height: 8px; margin-top: 6px; border-radius: 50%; background: var(--accent); animation: activity-pulse 1.5s ease-in-out infinite; }
+.live-activity strong { display: block; color: var(--text); font-size: 13px; }
+.live-activity p { margin: 3px 0 0; font-size: 12px; line-height: 1.5; }
 .automation-events { max-width: 880px; margin: 18px auto 0; border: 1px solid var(--line); border-radius: 8px; background: var(--panel); color: var(--muted); }
 .automation-events summary { display: flex; align-items: center; justify-content: space-between; min-height: 42px; padding: 0 13px; color: var(--text); cursor: pointer; font-size: 13px; font-weight: 700; }
 .automation-event-count { display: inline-grid; place-items: center; min-width: 22px; height: 22px; padding: 0 6px; border-radius: 11px; background: var(--panel-strong); color: var(--muted); font-size: 11px; }
@@ -228,7 +233,7 @@ html[data-theme="liquid-glass"] .project-heading { background: var(--nav-sidebar
 html[data-theme="liquid-glass"] .sidebar,
 html[data-theme="liquid-glass"] .workspace { backdrop-filter: blur(20px) saturate(1.2); }
 html[data-theme="liquid-glass"] .workspace { background: linear-gradient(125deg, rgba(28, 34, 78, .27), rgba(23, 15, 55, .16)); }
-html[data-theme="liquid-glass"] .project-toggle:hover { background: var(--nav-project-hover); }
+html[data-theme="liquid-glass"] .project-heading:hover { background: var(--nav-project-hover); }
 html[data-theme="liquid-glass"] .thread-row:hover { background: var(--nav-thread-hover); }
 html[data-theme="liquid-glass"] .thread-row.selected { background: var(--nav-thread-selected); border-color: var(--nav-thread-selected-border); }
 html[data-theme="liquid-glass"] .project-count,
@@ -241,6 +246,8 @@ html[data-theme="liquid-glass"] .theme-option,
 html[data-theme="liquid-glass"] .automation-events { background: rgba(28, 34, 75, .58); }
 html[data-theme="liquid-glass"] .message.assistant,
 html[data-theme="liquid-glass"] .message.tool,
+html[data-theme="liquid-glass"] .message.activity,
+html[data-theme="liquid-glass"] .live-activity,
 html[data-theme="liquid-glass"] .automation-event { background: rgba(17, 22, 54, .6); }
 html[data-theme="liquid-glass"] .new-thread-dialog input,
 html[data-theme="liquid-glass"] .new-thread-dialog select { background: rgba(9, 13, 34, .7); }
@@ -496,12 +503,12 @@ html[data-theme="data-dense-dashboard"] .workspace,
 html[data-theme="accessible-ethical"] .workspace { background: var(--theme-workspace); }
 html[data-theme="glassmorphism"] .sidebar,
 html[data-theme="glassmorphism"] .workspace { backdrop-filter: blur(16px) saturate(1.15); }
-html[data-theme="swiss-modernism"] .project-toggle:hover,
-html[data-theme="glassmorphism"] .project-toggle:hover,
-html[data-theme="real-time-monitoring"] .project-toggle:hover,
-html[data-theme="data-dense-dashboard"] .project-toggle:hover,
-html[data-theme="accessible-ethical"] .project-toggle:hover { background: var(--nav-project-hover); }
-html[data-theme="swiss-modernism"] .project-toggle:hover { color: var(--nav-project-text); }
+html[data-theme="swiss-modernism"] .project-heading:hover,
+html[data-theme="glassmorphism"] .project-heading:hover,
+html[data-theme="real-time-monitoring"] .project-heading:hover,
+html[data-theme="data-dense-dashboard"] .project-heading:hover,
+html[data-theme="accessible-ethical"] .project-heading:hover { background: var(--nav-project-hover); }
+html[data-theme="swiss-modernism"] .project-heading:hover { color: var(--nav-project-text); }
 html[data-theme="swiss-modernism"] .thread-row:hover,
 html[data-theme="glassmorphism"] .thread-row:hover,
 html[data-theme="real-time-monitoring"] .thread-row:hover,
@@ -557,6 +564,16 @@ html[data-theme="glassmorphism"] .message.tool,
 html[data-theme="real-time-monitoring"] .message.tool,
 html[data-theme="data-dense-dashboard"] .message.tool,
 html[data-theme="accessible-ethical"] .message.tool { background: var(--theme-tool); }
+html[data-theme="swiss-modernism"] .message.activity,
+html[data-theme="glassmorphism"] .message.activity,
+html[data-theme="real-time-monitoring"] .message.activity,
+html[data-theme="data-dense-dashboard"] .message.activity,
+html[data-theme="accessible-ethical"] .message.activity,
+html[data-theme="swiss-modernism"] .live-activity,
+html[data-theme="glassmorphism"] .live-activity,
+html[data-theme="real-time-monitoring"] .live-activity,
+html[data-theme="data-dense-dashboard"] .live-activity,
+html[data-theme="accessible-ethical"] .live-activity { background: var(--theme-surface); }
 html[data-theme="swiss-modernism"] .new-thread-dialog input,
 html[data-theme="glassmorphism"] .new-thread-dialog input,
 html[data-theme="real-time-monitoring"] .new-thread-dialog input,
@@ -605,10 +622,15 @@ html[data-theme="accessible-ethical"] :focus-visible { outline: 3px solid #ffe60
   50% { box-shadow: 0 0 0 5px rgba(56, 226, 154, .22); }
 }
 
+@keyframes activity-pulse {
+  50% { opacity: .42; transform: scale(.78); }
+}
+
 @media (prefers-reduced-motion: reduce) {
   html[data-theme="liquid-glass"] .app-shell::before,
   html[data-theme="liquid-glass"] .app-shell::after,
-  html[data-theme="real-time-monitoring"] .status-dot.running { animation: none; }
+  html[data-theme="real-time-monitoring"] .status-dot.running,
+  .live-activity-indicator { animation: none; }
 }
 
 @media (max-width: 760px) {

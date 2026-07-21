@@ -10,7 +10,9 @@ const LIST_EVENTS = new Set([
 ]);
 
 const DETAIL_EVENTS = new Set([
+  "turn/started",
   "turn/completed",
+  "thread/status/changed",
   "thread/compacted",
   "thread/name/updated",
   "thread/settings/updated",
@@ -30,7 +32,8 @@ export function classifyCodexEvent(event, selectedThreadId) {
     threadId,
     isSelectedThread,
     refreshList: LIST_EVENTS.has(method),
-    refreshDetail: isSelectedThread && DETAIL_EVENTS.has(method),
+    refreshDetail: isSelectedThread && (DETAIL_EVENTS.has(method) || method.startsWith("item/")),
+    activity: isSelectedThread && (method === "turn/started" || method === "turn/completed" || method === "thread/status/changed" || method.startsWith("item/")),
     clearSelection: isSelectedThread && method === "thread/deleted",
     markRunning: isSelectedThread && method === "turn/started",
   };

@@ -1,4 +1,5 @@
 import { classifyCodexEvent } from "./refresh-policy.js";
+import { describeLiveActivity } from "./live-activity.js";
 import { toTranscript, transcriptSignature } from "./transcript.js";
 
 const THEME_IDS = new Set([
@@ -21,6 +22,9 @@ const state = {
   health: null,
   listRefreshTimer: null,
   detailRefreshTimer: null,
+  runningRefreshTimer: null,
+  detailRefreshInFlight: false,
+  liveActivity: null,
   listRequestId: 0,
   detailRequestId: 0,
   renderedThreadSignature: null,
@@ -47,6 +51,9 @@ const elements = {
   empty: $("#empty-state"),
   view: $("#thread-view"),
   messages: $("#messages"),
+  liveActivity: $("#live-activity"),
+  liveActivityTitle: $("#live-activity-title"),
+  liveActivityDetail: $("#live-activity-detail"),
   automationEvents: $("#automation-events"),
   automationEventCount: $("#automation-event-count"),
   automationEventList: $("#automation-event-list"),
@@ -118,13 +125,6 @@ function renderThreadList() {
 
     const heading = document.createElement("div");
     heading.className = "project-heading";
-    const toggle = document.createElement("button");
-    toggle.className = "project-toggle";
-    toggle.type = "button";
-    toggle.setAttribute("aria-expanded", String(!collapsed));
-    toggle.setAttribute("aria-controls", rowsId);
-    toggle.title = `${collapsed ? "展开" : "收起"} ${group.name}${isUngrouped ? "" : `\n${group.description}`}`;
-    toggle.addEventListener("click", () => toggleProjectGroup(group.key));
 
     const mark = document.createElement("span");
     mark.className = "project-mark";
@@ -132,6 +132,13 @@ function renderThreadList() {
     const chevron = document.createElement("span");
     chevron.className = "project-chevron";
     chevron.setAttribute("aria-hidden", "true");
+    const nameToggle = document.createElement("button");
+    nameToggle.className = "project-name-toggle";
+    nameToggle.type = "button";
+    nameToggle.setAttribute("aria-expanded", String(!collapsed));
+    nameToggle.setAttribute("aria-controls", rowsId);
+    nameToggle.title = `${collapsed ? "展开" : "收起"} ${group.name}${isUngrouped ? "" : `\n${group.description}`}`;
+    nameToggle.addEventListener("click", () => toggleProjectGroup(group.key));
     const title = document.createElement("div");
     title.className = "project-heading-text";
     const name = document.createElement("strong");
@@ -144,8 +151,8 @@ function renderThreadList() {
     count.textContent = String(group.threads.length);
     count.setAttribute("aria-label", `${group.threads.length} 个对话`);
     title.append(name, description);
-    toggle.append(mark, chevron, title, count);
-    heading.append(toggle);
+    nameToggle.append(title);
+    heading.append(mark, chevron, nameToggle, count);
 
     section.append(heading);
     const rows = document.createElement("div");
@@ -250,6 +257,10 @@ function threadRow(thread) {
 
 async function selectThread(threadId, { follow = true } = {}) {
   const isNewSelection = state.selectedId !== threadId;
+  if (isNewSelection) {
+    stopRunningRefresh();
+    state.liveActivity = null;
+  }
   state.selectedId = threadId;
   setMobileSidebar(false);
   const requestId = ++state.detailRequestId;
@@ -268,7 +279,8 @@ async function selectThread(threadId, { follow = true } = {}) {
 
 async function refreshSelectedThread({ follow = false } = {}) {
   const threadId = state.selectedId;
-  if (!threadId) return;
+  if (!threadId || state.detailRefreshInFlight) return;
+  state.detailRefreshInFlight = true;
   const requestId = ++state.detailRequestId;
 
   try {
@@ -278,6 +290,8 @@ async function refreshSelectedThread({ follow = false } = {}) {
     renderSelectedThread({ follow });
   } catch (error) {
     console.warn(error);
+  } finally {
+    state.detailRefreshInFlight = false;
   }
 }
 
@@ -290,10 +304,13 @@ function renderSelectedThread({ follow = false } = {}) {
   elements.composer.classList.remove("hidden");
   elements.title.textContent = threadTitle(thread);
   elements.cwd.textContent = thread.cwd || "未知工作目录";
-  elements.turnStatus.textContent = isRunning(thread.status) ? "Codex 正在执行" : "准备就绪";
-  elements.interrupt.disabled = !isRunning(thread.status);
+  syncRunningRefresh(thread);
+  const busy = isThreadBusy(thread);
+  elements.turnStatus.textContent = busy ? state.liveActivity?.title ?? "Codex 正在执行" : "准备就绪";
+  elements.interrupt.disabled = !busy;
   renderThreadSettings(thread);
   renderMessages(thread, { follow });
+  renderLiveActivity(thread);
 }
 
 function renderThreadSettings(thread) {
@@ -446,6 +463,65 @@ function renderMessages(thread, { follow = false } = {}) {
   if (shouldFollow) elements.view.scrollTop = elements.view.scrollHeight;
 }
 
+function setLiveActivity(threadId, activity, { running = true } = {}) {
+  if (!threadId || !activity) return;
+  state.liveActivity = { threadId, running, ...activity };
+  if (threadId === state.selectedId && state.selectedThread && state.activeView === "console") {
+    elements.turnStatus.textContent = activity.title;
+    elements.interrupt.disabled = !isThreadBusy(state.selectedThread);
+    renderLiveActivity(state.selectedThread);
+  }
+}
+
+function renderLiveActivity(thread) {
+  const activity = state.liveActivity?.threadId === thread?.id ? state.liveActivity : null;
+  if (!activity) {
+    elements.liveActivity.classList.add("hidden");
+    return;
+  }
+  elements.liveActivityTitle.textContent = activity.title;
+  elements.liveActivityDetail.textContent = activity.detail || "正在更新任务进度。";
+  elements.liveActivity.classList.remove("hidden");
+}
+
+function isThreadBusy(thread) {
+  return isRunning(thread?.status) || Boolean(state.liveActivity?.running && state.liveActivity.threadId === thread?.id);
+}
+
+function syncRunningRefresh(thread) {
+  if (!thread?.id) return;
+  const activity = state.liveActivity?.threadId === thread.id ? state.liveActivity : null;
+  if (isRunning(thread.status)) {
+    if (!activity || !activity.running) {
+      setLiveActivity(thread.id, { title: "Codex 正在思考", detail: "正在分析下一步操作。" });
+    }
+    startRunningRefresh();
+    return;
+  }
+  if (activity?.running) {
+    startRunningRefresh();
+    return;
+  }
+  if (activity) state.liveActivity = null;
+  stopRunningRefresh();
+}
+
+function startRunningRefresh() {
+  if (state.runningRefreshTimer) return;
+  state.runningRefreshTimer = setInterval(() => {
+    if (!state.selectedId || state.activeView !== "console" || !isThreadBusy(state.selectedThread)) {
+      stopRunningRefresh();
+      return;
+    }
+    refreshSelectedThread({ follow: false });
+  }, 1400);
+}
+
+function stopRunningRefresh() {
+  if (state.runningRefreshTimer) clearInterval(state.runningRefreshTimer);
+  state.runningRefreshTimer = null;
+}
+
 function renderAutomationEvents(events) {
   elements.automationEventList.replaceChildren();
   if (!events.length) {
@@ -575,6 +651,7 @@ function setTheme(theme) {
 }
 
 function showSettings() {
+  stopRunningRefresh();
   state.activeView = "settings";
   elements.header.classList.add("hidden");
   elements.empty.classList.add("hidden");
@@ -616,7 +693,7 @@ function scheduleListRefresh(delay = 900) {
   }, delay);
 }
 
-function scheduleDetailRefresh(delay = 700) {
+function scheduleDetailRefresh(delay = 300) {
   if (!state.selectedId) return;
   clearTimeout(state.detailRefreshTimer);
   state.detailRefreshTimer = setTimeout(() => refreshSelectedThread({ follow: false }), delay);
@@ -630,18 +707,29 @@ function handleCodexEvent(event) {
     return;
   }
 
-  if (policy.markRunning) {
-    elements.turnStatus.textContent = "Codex 正在执行";
-    elements.interrupt.disabled = false;
-  }
-  if (policy.isSelectedThread && event.method === "thread/status/changed" && state.selectedThread) {
-    state.selectedThread.status = event.params?.status ?? state.selectedThread.status;
-    elements.turnStatus.textContent = isRunning(state.selectedThread.status) ? "Codex 正在执行" : "准备就绪";
-    elements.interrupt.disabled = !isRunning(state.selectedThread.status);
+  if (policy.isSelectedThread && state.selectedThread) {
+    const activity = policy.activity ? describeLiveActivity(event) : null;
+    if (policy.markRunning) {
+      state.selectedThread = { ...state.selectedThread, status: "running" };
+      setLiveActivity(state.selectedId, activity ?? { title: "Codex 正在思考", detail: "正在分析下一步操作。" });
+      startRunningRefresh();
+    } else if (event.method === "thread/status/changed") {
+      const status = event.params?.status ?? event.params?.thread?.status ?? state.selectedThread.status;
+      state.selectedThread = { ...state.selectedThread, status };
+      if (isRunning(status)) {
+        setLiveActivity(state.selectedId, activity ?? { title: "Codex 正在执行", detail: "正在继续处理当前任务。" });
+        startRunningRefresh();
+      } else {
+        setLiveActivity(state.selectedId, { title: "正在同步结果", detail: "Codex 已完成执行，正在加载最新对话。" }, { running: false });
+      }
+    } else if (activity) {
+      setLiveActivity(state.selectedId, activity, { running: event.method !== "turn/completed" });
+    }
+    renderSelectedThread({ follow: false });
   }
 
   if (policy.refreshList) scheduleListRefresh();
-  if (policy.refreshDetail) scheduleDetailRefresh();
+  if (policy.refreshDetail) scheduleDetailRefresh(event.method === "turn/completed" ? 160 : 260);
 }
 
 $("#new-thread").addEventListener("click", showNewThreadDialog);
@@ -721,8 +809,16 @@ elements.composer.addEventListener("submit", async (event) => {
       method: "POST",
       body: JSON.stringify({ text }),
     });
-    elements.turnStatus.textContent = result.mode === "steer" ? "已追加指令" : "Codex 正在执行";
-    elements.interrupt.disabled = false;
+    if (state.selectedThread) {
+      state.selectedThread = { ...state.selectedThread, status: "running" };
+      setLiveActivity(state.selectedId, {
+        title: result.mode === "steer" ? "Codex 正在处理追加指令" : "Codex 正在思考",
+        detail: result.mode === "steer" ? "正在将新指令合并到当前执行。" : "正在分析下一步操作。",
+      });
+      startRunningRefresh();
+      renderSelectedThread({ follow: false });
+    }
+    scheduleDetailRefresh(160);
     scheduleListRefresh();
   } catch (error) {
     elements.messageInput.value = text;
@@ -734,8 +830,9 @@ elements.interrupt.addEventListener("click", async () => {
   if (!state.selectedId) return;
   try {
     await api(`/api/threads/${encodeURIComponent(state.selectedId)}/interrupt`, { method: "POST", body: "{}" });
-    elements.turnStatus.textContent = "已请求停止";
-    elements.interrupt.disabled = true;
+    setLiveActivity(state.selectedId, { title: "已请求停止", detail: "正在等待 Codex 停止当前执行。" }, { running: false });
+    renderSelectedThread({ follow: false });
+    scheduleDetailRefresh(160);
     scheduleListRefresh();
   } catch (error) {
     showToast(error.message, "error");
@@ -778,8 +875,12 @@ $("#delete-thread").addEventListener("click", async () => {
 });
 
 function clearSelection() {
+  stopRunningRefresh();
+  clearTimeout(state.detailRefreshTimer);
+  state.detailRequestId += 1;
   state.selectedId = null;
   state.selectedThread = null;
+  state.liveActivity = null;
   state.renderedThreadSignature = null;
   if (state.activeView === "console") {
     elements.header.classList.add("hidden");

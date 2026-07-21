@@ -1,3 +1,5 @@
+import { describeItemActivity } from "./live-activity.js";
+
 const AUTOMATION_ENVELOPE_ROOT = "heartbeat";
 
 export function toTranscript(thread) {
@@ -66,13 +68,15 @@ function messageFromItem(item) {
 
   if (item.type === "agentMessage") {
     const text = nonEmptyText(item.text);
-    return text ? { role: "assistant", label: "Codex", text } : null;
+    if (!text) return null;
+    const isCommentary = String(item.phase ?? "").toLowerCase() === "commentary";
+    return isCommentary ? { role: "activity", label: "Codex 正在执行", text } : { role: "assistant", label: "Codex", text };
   }
 
-  if (item.type === "commandExecution") {
-    const text = nonEmptyText(item.command);
-    return text ? { role: "tool", label: "终端命令", text } : null;
-  }
+  if (item.type === "reasoning") return null;
+
+  const activity = describeItemActivity(item);
+  if (activity) return { role: "activity", label: activity.title, text: activity.detail };
 
   return null;
 }

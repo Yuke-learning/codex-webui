@@ -70,6 +70,13 @@
 
         <section id="thread-view" class="thread-view hidden" aria-live="polite">
           <div id="messages" class="messages"></div>
+          <div id="live-activity" class="live-activity hidden" role="status">
+            <span class="live-activity-indicator" aria-hidden="true"></span>
+            <div>
+              <strong id="live-activity-title"></strong>
+              <p id="live-activity-detail"></p>
+            </div>
+          </div>
           <details id="automation-events" class="automation-events hidden">
             <summary>自动化事件 <span id="automation-event-count" class="automation-event-count"></span></summary>
             <div id="automation-event-list" class="automation-event-list"></div>

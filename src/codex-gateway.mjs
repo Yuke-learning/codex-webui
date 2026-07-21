@@ -71,13 +71,15 @@ export class CodexGateway extends EventEmitter {
     assertThreadId(threadId);
     const resume = await this.#request("thread/resume", { threadId, excludeTurns: true });
     const result = await this.#request("thread/read", { threadId, includeTurns: true });
-    return {
+    const thread = {
       ...result.thread,
       settings: {
         model: resume.model,
         effort: resume.reasoningEffort,
       },
     };
+    if (this.#activeTurns.has(threadId) && !isThreadRunning(thread.status)) thread.status = "running";
+    return thread;
   }
 
   async createThread({ cwd, model, effort } = {}) {
