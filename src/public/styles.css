@@ -500,6 +500,7 @@ html[data-theme="glassmorphism"] .project-toggle:hover,
 html[data-theme="real-time-monitoring"] .project-toggle:hover,
 html[data-theme="data-dense-dashboard"] .project-toggle:hover,
 html[data-theme="accessible-ethical"] .project-toggle:hover { background: var(--nav-project-hover); }
+html[data-theme="swiss-modernism"] .project-toggle:hover { color: var(--nav-project-text); }
 html[data-theme="swiss-modernism"] .thread-row:hover,
 html[data-theme="glassmorphism"] .thread-row:hover,
 html[data-theme="real-time-monitoring"] .thread-row:hover,
