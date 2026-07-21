@@ -47,9 +47,16 @@ button { cursor: pointer; }
 .sidebar-content { display: flex; flex: 1; flex-direction: column; min-height: 0; gap: 8px; overflow: hidden; }
 .thread-list { display: flex; flex: 1; flex-direction: column; gap: 13px; min-height: 0; overflow-y: auto; overscroll-behavior: contain; padding: 2px 2px 18px; }
 .project-group { display: grid; gap: 4px; }
-.project-heading { position: sticky; z-index: 1; top: 0; display: grid; gap: 1px; padding: 9px 7px 7px; background: #15171b; }
-.project-heading strong { overflow: hidden; color: var(--muted); font-size: 11px; letter-spacing: .06em; text-overflow: ellipsis; text-transform: uppercase; white-space: nowrap; }
-.project-heading span { overflow: hidden; color: var(--dim); font-size: 11px; text-overflow: ellipsis; white-space: nowrap; }
+.project-heading { position: sticky; z-index: 1; top: 0; background: #15171b; }
+.project-toggle { display: grid; grid-template-columns: 14px minmax(0, 1fr) auto; align-items: center; width: 100%; gap: 7px; padding: 9px 7px 7px; border: 0; background: #15171b; color: var(--muted); text-align: left; }
+.project-toggle:hover { background: #1c2026; color: var(--text); }
+.project-chevron { display: inline-block; color: var(--dim); font-size: 13px; line-height: 1; transform: rotate(90deg); transition: transform .14s ease; }
+.project-group.is-collapsed .project-chevron { transform: rotate(0deg); }
+.project-heading-text { display: grid; min-width: 0; gap: 1px; }
+.project-heading strong { overflow: hidden; color: inherit; font-size: 11px; letter-spacing: .06em; text-overflow: ellipsis; text-transform: uppercase; white-space: nowrap; }
+.project-heading-text span { overflow: hidden; color: var(--dim); font-size: 11px; text-overflow: ellipsis; white-space: nowrap; }
+.project-count { min-width: 20px; padding: 2px 5px; border-radius: 8px; background: #252a32; color: var(--dim); font-size: 11px; font-variant-numeric: tabular-nums; text-align: center; }
+.project-toggle:hover .project-count { color: var(--muted); }
 .project-threads { display: grid; gap: 4px; }
 .thread-row { width: 100%; padding: 10px; text-align: left; color: var(--text); background: transparent; border: 1px solid transparent; border-radius: 10px; }
 .thread-row:hover { background: var(--panel); }

@@ -2,6 +2,7 @@ const state = {
   threads: [],
   models: [],
   threadSettings: new Map(),
+  collapsedProjectKeys: loadCollapsedProjectKeys(),
   selectedId: null,
   selectedThread: null,
   health: null,
@@ -75,23 +76,48 @@ function renderThreadList() {
 
   for (const group of groupThreads(state.threads)) {
     const section = document.createElement("section");
-    section.className = "project-group";
+    const containsSelectedThread = group.threads.some((thread) => thread.id === state.selectedId);
+    const collapsed = state.collapsedProjectKeys.has(group.key) && !containsSelectedThread;
+    if (containsSelectedThread) state.collapsedProjectKeys.delete(group.key);
+    section.className = `project-group${collapsed ? " is-collapsed" : ""}`;
 
     const heading = document.createElement("div");
     heading.className = "project-heading";
+    const toggle = document.createElement("button");
+    toggle.className = "project-toggle";
+    toggle.type = "button";
+    toggle.setAttribute("aria-expanded", String(!collapsed));
+    toggle.title = `${collapsed ? "展开" : "收起"}${group.name}`;
+    toggle.addEventListener("click", () => toggleProjectGroup(group.key));
+
+    const chevron = document.createElement("span");
+    chevron.className = "project-chevron";
+    chevron.setAttribute("aria-hidden", "true");
+    chevron.textContent = ">";
+    const title = document.createElement("div");
+    title.className = "project-heading-text";
     const name = document.createElement("strong");
     name.textContent = group.name;
     const description = document.createElement("span");
     description.textContent = group.description;
-    heading.append(name, description);
+    const count = document.createElement("span");
+    count.className = "project-count";
+    count.textContent = String(group.threads.length);
+    title.append(name, description);
+    toggle.append(chevron, title, count);
+    heading.append(toggle);
 
-    const rows = document.createElement("div");
-    rows.className = "project-threads";
-    for (const thread of group.threads) rows.append(threadRow(thread));
-    section.append(heading, rows);
+    section.append(heading);
+    if (!collapsed) {
+      const rows = document.createElement("div");
+      rows.className = "project-threads";
+      for (const thread of group.threads) rows.append(threadRow(thread));
+      section.append(rows);
+    }
     elements.list.append(section);
   }
 
+  persistCollapsedProjectKeys();
   elements.list.scrollTop = scrollTop;
 }
 
@@ -104,7 +130,12 @@ function groupThreads(threads) {
       ungrouped.push(thread);
       continue;
     }
-    const group = projects.get(thread.cwd) ?? { name: projectName(thread.cwd), description: thread.cwd, threads: [] };
+    const group = projects.get(thread.cwd) ?? {
+      key: `project:${thread.cwd}`,
+      name: projectName(thread.cwd),
+      description: thread.cwd,
+      threads: [],
+    };
     group.threads.push(thread);
     projects.set(thread.cwd, group);
   }
@@ -112,12 +143,39 @@ function groupThreads(threads) {
   const groups = [...projects.values()].sort((left, right) => latestGroupTime(right) - latestGroupTime(left));
   if (ungrouped.length) {
     groups.push({
+      key: "other",
       name: "不在项目中",
       description: "未检测到 Git 项目元数据",
       threads: ungrouped,
     });
   }
   return groups;
+}
+
+function toggleProjectGroup(key) {
+  if (state.collapsedProjectKeys.has(key)) {
+    state.collapsedProjectKeys.delete(key);
+  } else {
+    state.collapsedProjectKeys.add(key);
+  }
+  renderThreadList();
+}
+
+function loadCollapsedProjectKeys() {
+  try {
+    const stored = JSON.parse(localStorage.getItem("codex-webui.collapsed-projects.v1") ?? "[]");
+    return new Set(Array.isArray(stored) ? stored.filter((key) => typeof key === "string") : []);
+  } catch {
+    return new Set();
+  }
+}
+
+function persistCollapsedProjectKeys() {
+  try {
+    localStorage.setItem("codex-webui.collapsed-projects.v1", JSON.stringify([...state.collapsedProjectKeys]));
+  } catch {
+    // The page still works when browser storage is unavailable.
+  }
 }
 
 function latestGroupTime(group) {
