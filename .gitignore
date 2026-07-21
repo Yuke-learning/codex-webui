@@ -8,14 +8,24 @@ coverage/
 .env
 .env.*
 !.env.example
+AGENTS.md
+.agents/
+.codex/
 *.pem
 *.key
+*.secret
+*.token
+auth*.json
+credentials*.json
 secrets/
 
 # Local runtime state and logs
 data/
 logs/
 *.log
+*.sqlite
+*.sqlite-*
+*.jsonl
 
 # macOS
 .DS_Store
