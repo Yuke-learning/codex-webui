@@ -1,3 +1,5 @@
+import { classifyCodexEvent } from "./refresh-policy.js";
+
 const state = {
   threads: [],
   models: [],
@@ -6,7 +8,11 @@ const state = {
   selectedId: null,
   selectedThread: null,
   health: null,
-  refreshTimer: null,
+  listRefreshTimer: null,
+  detailRefreshTimer: null,
+  listRequestId: 0,
+  detailRequestId: 0,
+  renderedThreadSignature: null,
 };
 
 const $ = (selector) => document.querySelector(selector);
@@ -63,11 +69,14 @@ async function loadModels() {
 }
 
 async function loadThreads() {
+  const requestId = ++state.listRequestId;
   const search = elements.search.value.trim();
   const payload = await api(`/api/threads?archived=false&search=${encodeURIComponent(search)}`);
+  if (requestId !== state.listRequestId) return false;
   state.threads = payload.data;
   elements.count.textContent = `${payload.data.length} 个对话`;
   renderThreadList();
+  return true;
 }
 
 function renderThreadList() {
@@ -209,15 +218,34 @@ function threadRow(thread) {
 }
 
 async function selectThread(threadId, { follow = true } = {}) {
+  const isNewSelection = state.selectedId !== threadId;
   state.selectedId = threadId;
+  const requestId = ++state.detailRequestId;
   renderThreadList();
-  elements.messages.replaceChildren(messageNode("正在加载对话…", "tool", "状态"));
+  if (isNewSelection) elements.messages.replaceChildren(messageNode("正在加载对话…", "tool", "状态"));
   try {
     const payload = await api(`/api/threads/${encodeURIComponent(threadId)}`);
+    if (requestId !== state.detailRequestId || threadId !== state.selectedId) return;
     state.selectedThread = payload.thread;
+    state.renderedThreadSignature = null;
     renderSelectedThread({ follow });
   } catch (error) {
     showToast(error.message, "error");
+  }
+}
+
+async function refreshSelectedThread({ follow = false } = {}) {
+  const threadId = state.selectedId;
+  if (!threadId) return;
+  const requestId = ++state.detailRequestId;
+
+  try {
+    const payload = await api(`/api/threads/${encodeURIComponent(threadId)}`);
+    if (requestId !== state.detailRequestId || threadId !== state.selectedId) return;
+    state.selectedThread = payload.thread;
+    renderSelectedThread({ follow });
+  } catch (error) {
+    console.warn(error);
   }
 }
 
@@ -369,6 +397,8 @@ async function updateCurrentThreadSettings(changes) {
 }
 
 function renderMessages(thread, { follow = false } = {}) {
+  const signature = threadSignature(thread);
+  if (signature === state.renderedThreadSignature) return;
   const shouldFollow = follow || isNearBottom(elements.view);
   elements.messages.replaceChildren();
   const items = (thread.turns ?? []).flatMap((turn) => turn.items ?? []);
@@ -377,6 +407,7 @@ function renderMessages(thread, { follow = false } = {}) {
     empty.className = "empty-messages";
     empty.textContent = "这个线程还没有可显示的消息。发送第一条指令开始吧。";
     elements.messages.append(empty);
+    state.renderedThreadSignature = signature;
     return;
   }
   for (const item of items) {
@@ -384,7 +415,18 @@ function renderMessages(thread, { follow = false } = {}) {
     if (!text) continue;
     elements.messages.append(messageNode(text, itemRole(item), itemLabel(item)));
   }
+  state.renderedThreadSignature = signature;
   if (shouldFollow) elements.view.scrollTop = elements.view.scrollHeight;
+}
+
+function threadSignature(thread) {
+  return (thread.turns ?? []).map((turn) => {
+    const items = (turn.items ?? []).map((item) => {
+      const text = itemText(item);
+      return `${item.id ?? item.type ?? "item"}:${text.length}`;
+    });
+    return `${turn.id ?? "turn"}:${items.join(",")}`;
+  }).join("|");
 }
 
 function isNearBottom(element) {
@@ -466,16 +508,43 @@ function showToast(message, kind = "info", duration = 4200) {
   setTimeout(() => toast.remove(), duration);
 }
 
-function scheduleRefresh() {
-  clearTimeout(state.refreshTimer);
-  state.refreshTimer = setTimeout(async () => {
+function scheduleListRefresh(delay = 900) {
+  clearTimeout(state.listRefreshTimer);
+  state.listRefreshTimer = setTimeout(async () => {
     try {
       await loadThreads();
-      if (state.selectedId) await selectThread(state.selectedId, { follow: false });
     } catch (error) {
       console.warn(error);
     }
-  }, 450);
+  }, delay);
+}
+
+function scheduleDetailRefresh(delay = 700) {
+  if (!state.selectedId) return;
+  clearTimeout(state.detailRefreshTimer);
+  state.detailRefreshTimer = setTimeout(() => refreshSelectedThread({ follow: false }), delay);
+}
+
+function handleCodexEvent(event) {
+  const policy = classifyCodexEvent(event, state.selectedId);
+  if (policy.clearSelection) {
+    clearSelection();
+    scheduleListRefresh();
+    return;
+  }
+
+  if (policy.markRunning) {
+    elements.turnStatus.textContent = "Codex 正在执行";
+    elements.interrupt.disabled = false;
+  }
+  if (policy.isSelectedThread && event.method === "thread/status/changed" && state.selectedThread) {
+    state.selectedThread.status = event.params?.status ?? state.selectedThread.status;
+    elements.turnStatus.textContent = isRunning(state.selectedThread.status) ? "Codex 正在执行" : "准备就绪";
+    elements.interrupt.disabled = !isRunning(state.selectedThread.status);
+  }
+
+  if (policy.refreshList) scheduleListRefresh();
+  if (policy.refreshDetail) scheduleDetailRefresh();
 }
 
 $("#new-thread").addEventListener("click", showNewThreadDialog);
@@ -484,8 +553,7 @@ $("#close-dialog").addEventListener("click", () => elements.dialog.close());
 $("#cancel-dialog").addEventListener("click", () => elements.dialog.close());
 $("#refresh-threads").addEventListener("click", () => loadThreads().catch((error) => showToast(error.message, "error")));
 elements.search.addEventListener("input", () => {
-  clearTimeout(state.refreshTimer);
-  state.refreshTimer = setTimeout(() => loadThreads().catch((error) => showToast(error.message, "error")), 250);
+  scheduleListRefresh(250);
 });
 
 elements.modelInput.addEventListener("change", () => {
@@ -537,7 +605,7 @@ elements.composer.addEventListener("submit", async (event) => {
     });
     elements.turnStatus.textContent = result.mode === "steer" ? "已追加指令" : "Codex 正在执行";
     elements.interrupt.disabled = false;
-    scheduleRefresh();
+    scheduleListRefresh();
   } catch (error) {
     elements.messageInput.value = text;
     showToast(error.message, "error");
@@ -550,7 +618,7 @@ elements.interrupt.addEventListener("click", async () => {
     await api(`/api/threads/${encodeURIComponent(state.selectedId)}/interrupt`, { method: "POST", body: "{}" });
     elements.turnStatus.textContent = "已请求停止";
     elements.interrupt.disabled = true;
-    scheduleRefresh();
+    scheduleListRefresh();
   } catch (error) {
     showToast(error.message, "error");
   }
@@ -563,7 +631,7 @@ $("#rename-thread").addEventListener("click", async () => {
   try {
     await api(`/api/threads/${encodeURIComponent(state.selectedId)}`, { method: "PATCH", body: JSON.stringify({ name }) });
     await loadThreads();
-    await selectThread(state.selectedId, { follow: false });
+    await refreshSelectedThread({ follow: false });
   } catch (error) {
     showToast(error.message, "error");
   }
@@ -594,6 +662,7 @@ $("#delete-thread").addEventListener("click", async () => {
 function clearSelection() {
   state.selectedId = null;
   state.selectedThread = null;
+  state.renderedThreadSignature = null;
   elements.header.classList.add("hidden");
   elements.view.classList.add("hidden");
   elements.composer.classList.add("hidden");
@@ -601,7 +670,13 @@ function clearSelection() {
 }
 
 const events = new EventSource("/api/events");
-events.addEventListener("codex", scheduleRefresh);
+events.addEventListener("codex", (event) => {
+  try {
+    handleCodexEvent(JSON.parse(event.data));
+  } catch (error) {
+    console.warn("Ignored malformed Codex event.", error);
+  }
+});
 events.addEventListener("approval", (event) => {
   const request = JSON.parse(event.data);
   elements.approval.textContent = `Codex 正在等待审批（${request.method}）。为安全起见，第一版仅展示该提示；请在桌面 Codex App 中审阅。`;

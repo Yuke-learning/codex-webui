@@ -6,6 +6,7 @@ import process from "node:process";
 import { fileURLToPath } from "node:url";
 
 import { CodexGateway, InputError } from "./src/codex-gateway.mjs";
+import { shouldForwardCodexEvent } from "./src/public/refresh-policy.js";
 
 const rootDir = path.dirname(fileURLToPath(import.meta.url));
 const publicDir = path.join(rootDir, "src", "public");
@@ -17,10 +18,13 @@ const eventClients = new Set();
 const staticFiles = new Map([
   ["/", { file: "index.html", type: "text/html; charset=utf-8" }],
   ["/app.js", { file: "app.js", type: "text/javascript; charset=utf-8" }],
+  ["/refresh-policy.js", { file: "refresh-policy.js", type: "text/javascript; charset=utf-8" }],
   ["/styles.css", { file: "styles.css", type: "text/css; charset=utf-8" }],
 ]);
 
-gateway.on("notification", (event) => broadcast("codex", event));
+gateway.on("notification", (event) => {
+  if (shouldForwardCodexEvent(event)) broadcast("codex", event);
+});
 gateway.on("serverRequest", (event) => broadcast("approval", event));
 gateway.on("transportError", (event) => broadcast("transport-error", event));
 

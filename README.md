@@ -34,6 +34,7 @@ codex remote-control start --json
 - 左侧按 Git 项目分组对话，未关联项目的线程单独归类；项目节可折叠并保留本机浏览器偏好。左侧导航与主消息区独立滚动，顶部操作栏固定在消息区之外。
 - 新建线程、发送消息/追加指令、停止、改名、归档和带确认的删除。
 - 从 app-server 动态读取可用模型与推理强度；详情页显示线程的实际设置，并可将新的模型/强度应用于后续 turn。
+- SSE 事件按影响范围处理：目标和 token 使用量等未展示事件不会触发重绘；仅当前线程完成、压缩或设置变更才刷新详情。
 - 优先 `codex app-server proxy`、自动回退到直接 `codex app-server --stdio` 的 JSON-RPC adapter，支持 JSONL 与 `Content-Length` 帧。
 - loopback 默认监听、同源写请求检查、请求大小限制与安全的 `.gitignore`。
 
