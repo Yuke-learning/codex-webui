@@ -119,8 +119,14 @@ export class CodexRpcClient extends EventEmitter {
 
   close() {
     this.#closed = true;
-    this.#child?.kill();
-    this.#disconnect(new CodexRpcError("Codex app-server proxy was closed."));
+    const child = this.#child;
+    this.#child = null;
+    for (const pending of this.#pending.values()) {
+      clearTimeout(pending.timeout);
+      pending.reject(new CodexRpcError("Codex app-server proxy was closed."));
+    }
+    this.#pending.clear();
+    if (child && !child.killed) child.kill();
   }
 
   #handleData(chunk) {

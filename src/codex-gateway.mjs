@@ -62,21 +62,54 @@ export class CodexGateway extends EventEmitter {
     return (result.data ?? []).map(toThreadSummary);
   }
 
-  async readThread(threadId) {
-    assertThreadId(threadId);
-    const result = await this.#request("thread/read", { threadId, includeTurns: true });
-    return result.thread;
+  async listModels() {
+    const result = await this.#request("model/list", { limit: 100, includeHidden: false });
+    return (result.data ?? []).map(toModelSummary);
   }
 
-  async createThread({ cwd, model } = {}) {
+  async readThread(threadId) {
+    assertThreadId(threadId);
+    const resume = await this.#request("thread/resume", { threadId, excludeTurns: true });
+    const result = await this.#request("thread/read", { threadId, includeTurns: true });
+    return {
+      ...result.thread,
+      settings: {
+        model: resume.model,
+        effort: resume.reasoningEffort,
+      },
+    };
+  }
+
+  async createThread({ cwd, model, effort } = {}) {
     const safeCwd = assertAbsolutePath(cwd);
+    const safeModel = optionalText(model);
+    const safeEffort = optionalText(effort);
     const params = {
       cwd: safeCwd,
       approvalPolicy: "on-request",
-      ...(optionalText(model) ? { model: optionalText(model) } : {}),
+      ...(safeModel ? { model: safeModel } : {}),
     };
     const result = await this.#request("thread/start", params);
+    if (safeEffort) {
+      await this.#request("thread/settings/update", {
+        threadId: result.thread.id,
+        effort: safeEffort,
+      });
+    }
     return result.thread;
+  }
+
+  async updateThreadSettings(threadId, { model, effort } = {}) {
+    assertThreadId(threadId);
+    const safeModel = optionalText(model);
+    const safeEffort = optionalText(effort);
+    if (!safeModel && !safeEffort) throw new InputError("Choose a model or reasoning effort to update.");
+    await this.#request("thread/settings/update", {
+      threadId,
+      ...(safeModel ? { model: safeModel } : {}),
+      ...(safeEffort ? { effort: safeEffort } : {}),
+    });
+    return { model: safeModel, effort: safeEffort };
   }
 
   async renameThread(threadId, name) {
@@ -251,6 +284,7 @@ function toThreadSummary(thread) {
     updatedAt: thread.updatedAt,
     modelProvider: thread.modelProvider,
     parentThreadId: thread.parentThreadId ?? null,
+    isProject: Boolean(thread.gitInfo?.branch || thread.gitInfo?.sha || thread.gitInfo?.originUrl),
   };
 }
 
@@ -259,4 +293,16 @@ function summarizePreview(value) {
   const compact = value.replace(/\s+/g, " ").trim();
   if (!compact) return "";
   return compact.length > 96 ? `${compact.slice(0, 96)}…` : compact;
+}
+
+function toModelSummary(model) {
+  return {
+    id: model.id,
+    model: model.model,
+    displayName: model.displayName,
+    description: model.description,
+    isDefault: model.isDefault,
+    defaultReasoningEffort: model.defaultReasoningEffort,
+    supportedReasoningEfforts: model.supportedReasoningEfforts ?? [],
+  };
 }

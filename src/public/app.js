@@ -1,5 +1,7 @@
 const state = {
   threads: [],
+  models: [],
+  threadSettings: new Map(),
   selectedId: null,
   selectedThread: null,
   health: null,
@@ -15,6 +17,8 @@ const elements = {
   header: $("#thread-header"),
   title: $("#thread-title"),
   cwd: $("#thread-cwd"),
+  threadModel: $("#thread-model"),
+  threadEffort: $("#thread-effort"),
   empty: $("#empty-state"),
   view: $("#thread-view"),
   messages: $("#messages"),
@@ -27,6 +31,7 @@ const elements = {
   newThreadForm: $("#new-thread-form"),
   cwdInput: $("#cwd-input"),
   modelInput: $("#model-input"),
+  effortInput: $("#effort-input"),
   toast: $("#toast-region"),
 };
 
@@ -49,6 +54,13 @@ async function refreshHealth() {
   if (!health.ok) showToast(health.hint ?? health.error, "error", 8000);
 }
 
+async function loadModels() {
+  const payload = await api("/api/models");
+  state.models = payload.data ?? [];
+  renderNewThreadSettings();
+  if (state.selectedThread) renderThreadSettings(state.selectedThread);
+}
+
 async function loadThreads() {
   const search = elements.search.value.trim();
   const payload = await api(`/api/threads?archived=false&search=${encodeURIComponent(search)}`);
@@ -58,43 +70,100 @@ async function loadThreads() {
 }
 
 function renderThreadList() {
+  const scrollTop = elements.list.scrollTop;
   elements.list.replaceChildren();
-  for (const thread of state.threads) {
-    const button = document.createElement("button");
-    button.className = `thread-row${thread.id === state.selectedId ? " selected" : ""}`;
-    button.type = "button";
-    button.title = thread.cwd || "";
-    button.addEventListener("click", () => selectThread(thread.id));
 
-    const title = document.createElement("div");
-    title.className = "thread-row-title";
-    title.textContent = threadTitle(thread);
-    const meta = document.createElement("div");
-    meta.className = "thread-row-meta";
-    const dot = document.createElement("span");
-    dot.className = `status-dot${isRunning(thread.status) ? " running" : ""}`;
-    const info = document.createElement("span");
-    info.textContent = relativeTime(thread.updatedAt || thread.createdAt);
-    meta.append(dot, info);
-    button.append(title, meta);
-    elements.list.append(button);
+  for (const group of groupThreads(state.threads)) {
+    const section = document.createElement("section");
+    section.className = "project-group";
+
+    const heading = document.createElement("div");
+    heading.className = "project-heading";
+    const name = document.createElement("strong");
+    name.textContent = group.name;
+    const description = document.createElement("span");
+    description.textContent = group.description;
+    heading.append(name, description);
+
+    const rows = document.createElement("div");
+    rows.className = "project-threads";
+    for (const thread of group.threads) rows.append(threadRow(thread));
+    section.append(heading, rows);
+    elements.list.append(section);
   }
+
+  elements.list.scrollTop = scrollTop;
 }
 
-async function selectThread(threadId) {
+function groupThreads(threads) {
+  const projects = new Map();
+  const ungrouped = [];
+
+  for (const thread of threads) {
+    if (!thread.isProject || !thread.cwd) {
+      ungrouped.push(thread);
+      continue;
+    }
+    const group = projects.get(thread.cwd) ?? { name: projectName(thread.cwd), description: thread.cwd, threads: [] };
+    group.threads.push(thread);
+    projects.set(thread.cwd, group);
+  }
+
+  const groups = [...projects.values()].sort((left, right) => latestGroupTime(right) - latestGroupTime(left));
+  if (ungrouped.length) {
+    groups.push({
+      name: "不在项目中",
+      description: "未检测到 Git 项目元数据",
+      threads: ungrouped,
+    });
+  }
+  return groups;
+}
+
+function latestGroupTime(group) {
+  return Math.max(...group.threads.map((thread) => timestampValue(thread.updatedAt || thread.createdAt)));
+}
+
+function projectName(cwd) {
+  const segments = cwd.split("/").filter(Boolean);
+  return segments.at(-1) || cwd;
+}
+
+function threadRow(thread) {
+  const button = document.createElement("button");
+  button.className = `thread-row${thread.id === state.selectedId ? " selected" : ""}`;
+  button.type = "button";
+  button.title = thread.cwd || "";
+  button.addEventListener("click", () => selectThread(thread.id));
+
+  const title = document.createElement("div");
+  title.className = "thread-row-title";
+  title.textContent = threadTitle(thread);
+  const meta = document.createElement("div");
+  meta.className = "thread-row-meta";
+  const dot = document.createElement("span");
+  dot.className = `status-dot${isRunning(thread.status) ? " running" : ""}`;
+  const info = document.createElement("span");
+  info.textContent = relativeTime(thread.updatedAt || thread.createdAt);
+  meta.append(dot, info);
+  button.append(title, meta);
+  return button;
+}
+
+async function selectThread(threadId, { follow = true } = {}) {
   state.selectedId = threadId;
   renderThreadList();
   elements.messages.replaceChildren(messageNode("正在加载对话…", "tool", "状态"));
   try {
     const payload = await api(`/api/threads/${encodeURIComponent(threadId)}`);
     state.selectedThread = payload.thread;
-    renderSelectedThread();
+    renderSelectedThread({ follow });
   } catch (error) {
     showToast(error.message, "error");
   }
 }
 
-function renderSelectedThread() {
+function renderSelectedThread({ follow = false } = {}) {
   const thread = state.selectedThread;
   if (!thread) return;
   elements.empty.classList.add("hidden");
@@ -105,10 +174,144 @@ function renderSelectedThread() {
   elements.cwd.textContent = thread.cwd || "未知工作目录";
   elements.turnStatus.textContent = isRunning(thread.status) ? "Codex 正在执行" : "准备就绪";
   elements.interrupt.disabled = !isRunning(thread.status);
-  renderMessages(thread);
+  renderThreadSettings(thread);
+  renderMessages(thread, { follow });
 }
 
-function renderMessages(thread) {
+function renderThreadSettings(thread) {
+  ensureCurrentModel(thread.settings?.model, thread.settings?.effort);
+  const settings = settingsFor(thread);
+  populateModelSelect(elements.threadModel, settings.model);
+  const currentModel = modelFor(settings.model);
+  const effort = supportedEffort(currentModel, settings.effort) ? settings.effort : currentModel?.defaultReasoningEffort;
+  populateEffortSelect(elements.threadEffort, currentModel, effort);
+  elements.threadModel.disabled = state.models.length === 0;
+  elements.threadEffort.disabled = !currentModel || currentModel.supportedReasoningEfforts.length === 0;
+}
+
+function renderNewThreadSettings() {
+  const defaultModel = defaultModelForPicker();
+  const selectedModel = modelFor(elements.modelInput.value) ?? defaultModel;
+  populateModelSelect(elements.modelInput, selectedModel?.model);
+  const currentModel = modelFor(elements.modelInput.value) ?? defaultModel;
+  populateEffortSelect(elements.effortInput, currentModel, currentModel?.defaultReasoningEffort);
+  elements.modelInput.disabled = state.models.length === 0;
+  elements.effortInput.disabled = !currentModel || currentModel.supportedReasoningEfforts.length === 0;
+}
+
+function populateModelSelect(select, selected) {
+  select.replaceChildren();
+  if (!state.models.length) {
+    select.append(option("", "没有可用模型"));
+    return;
+  }
+  for (const model of state.models) {
+    const item = option(model.model, model.displayName || model.model);
+    item.title = model.description || "";
+    item.selected = model.model === selected;
+    select.append(item);
+  }
+  if (!select.value) select.value = defaultModelForPicker()?.model ?? state.models[0].model;
+}
+
+function populateEffortSelect(select, model, selected) {
+  select.replaceChildren();
+  if (!model?.supportedReasoningEfforts?.length) {
+    select.append(option("", "使用模型默认值"));
+    return;
+  }
+  for (const effort of model.supportedReasoningEfforts) {
+    const item = option(effort.reasoningEffort, effortLabel(effort));
+    item.title = effort.description || "";
+    item.selected = effort.reasoningEffort === selected;
+    select.append(item);
+  }
+  if (!select.value) select.value = model.defaultReasoningEffort;
+}
+
+function option(value, label) {
+  const item = document.createElement("option");
+  item.value = value;
+  item.textContent = label;
+  return item;
+}
+
+function effortLabel(effort) {
+  const labels = {
+    low: "低",
+    medium: "中",
+    high: "高",
+    xhigh: "超高",
+    max: "最大",
+    ultra: "极限",
+  };
+  return labels[effort.reasoningEffort] ?? effort.reasoningEffort;
+}
+
+function settingsFor(thread) {
+  const fromService = thread.settings ?? {};
+  const selected = state.threadSettings.get(thread.id) ?? {};
+  const preferredModel = modelFor(selected.model ?? fromService.model) ?? defaultModelForPicker();
+  return {
+    model: preferredModel?.model ?? "",
+    effort: selected.effort ?? fromService.effort ?? preferredModel?.defaultReasoningEffort ?? "",
+  };
+}
+
+function defaultModelForPicker() {
+  return state.models.find((model) => model.isDefault) ?? state.models[0];
+}
+
+function modelFor(modelName) {
+  return state.models.find((model) => model.model === modelName || model.id === modelName);
+}
+
+function ensureCurrentModel(modelName, effort) {
+  if (!modelName || modelFor(modelName)) return;
+  state.models.unshift({
+    id: modelName,
+    model: modelName,
+    displayName: `${modelName}（当前配置）`,
+    description: "当前线程使用的本机 Codex Provider 模型。",
+    isDefault: false,
+    defaultReasoningEffort: effort || "",
+    supportedReasoningEfforts: effort
+      ? [{ reasoningEffort: effort, description: "当前线程的推理强度" }]
+      : [],
+  });
+}
+
+function supportedEffort(model, effort) {
+  return model?.supportedReasoningEfforts?.some((item) => item.reasoningEffort === effort);
+}
+
+async function updateCurrentThreadSettings(changes) {
+  if (!state.selectedId) return;
+  const previous = settingsFor(state.selectedThread);
+  const next = { ...previous, ...changes };
+  const selectedModel = modelFor(next.model);
+  if (changes.model && !supportedEffort(selectedModel, next.effort)) {
+    next.effort = selectedModel?.defaultReasoningEffort ?? "";
+  }
+
+  elements.threadModel.disabled = true;
+  elements.threadEffort.disabled = true;
+  try {
+    await api(`/api/threads/${encodeURIComponent(state.selectedId)}/settings`, {
+      method: "PATCH",
+      body: JSON.stringify(next),
+    });
+    state.threadSettings.set(state.selectedId, next);
+    renderThreadSettings(state.selectedThread);
+    showToast("模型设置会在后续对话中生效。", "info");
+  } catch (error) {
+    renderThreadSettings(state.selectedThread);
+    showToast(error.message, "error");
+  }
+}
+
+function renderMessages(thread, { follow = false } = {}) {
+  const shouldFollow = follow || isNearBottom(elements.view);
   elements.messages.replaceChildren();
   const items = (thread.turns ?? []).flatMap((turn) => turn.items ?? []);
   if (!items.length) {
@@ -123,7 +326,11 @@ function renderMessages(thread) {
     if (!text) continue;
     elements.messages.append(messageNode(text, itemRole(item), itemLabel(item)));
   }
-  elements.view.scrollTop = elements.view.scrollHeight;
+  if (shouldFollow) elements.view.scrollTop = elements.view.scrollHeight;
+}
+
+function isNearBottom(element) {
+  return element.scrollHeight - element.scrollTop - element.clientHeight < 120;
 }
 
 function messageNode(text, role, label) {
@@ -174,10 +381,14 @@ function isRunning(status) {
   return status?.type === "running" || status?.status === "running";
 }
 
+function timestampValue(timestamp) {
+  if (!timestamp) return 0;
+  return timestamp > 1e12 ? timestamp : timestamp * 1000;
+}
+
 function relativeTime(timestamp) {
   if (!timestamp) return "刚刚";
-  const value = timestamp > 1e12 ? timestamp : timestamp * 1000;
-  const minutes = Math.round((Date.now() - value) / 60_000);
+  const minutes = Math.round((Date.now() - timestampValue(timestamp)) / 60_000);
   if (minutes < 1) return "刚刚";
   if (minutes < 60) return `${minutes} 分钟前`;
   if (minutes < 1440) return `${Math.round(minutes / 60)} 小时前`;
@@ -185,6 +396,7 @@ function relativeTime(timestamp) {
 }
 
 function showNewThreadDialog() {
+  renderNewThreadSettings();
   if (typeof elements.dialog.showModal === "function") elements.dialog.showModal();
 }
 
@@ -201,7 +413,7 @@ function scheduleRefresh() {
   state.refreshTimer = setTimeout(async () => {
     try {
       await loadThreads();
-      if (state.selectedId) await selectThread(state.selectedId);
+      if (state.selectedId) await selectThread(state.selectedId, { follow: false });
     } catch (error) {
       console.warn(error);
     }
@@ -218,12 +430,32 @@ elements.search.addEventListener("input", () => {
   state.refreshTimer = setTimeout(() => loadThreads().catch((error) => showToast(error.message, "error")), 250);
 });
 
+elements.modelInput.addEventListener("change", () => {
+  const selected = modelFor(elements.modelInput.value);
+  populateEffortSelect(elements.effortInput, selected, selected?.defaultReasoningEffort);
+});
+
+elements.threadModel.addEventListener("change", () => {
+  updateCurrentThreadSettings({ model: elements.threadModel.value });
+});
+elements.threadEffort.addEventListener("change", () => {
+  updateCurrentThreadSettings({ effort: elements.threadEffort.value });
+});
+
 elements.newThreadForm.addEventListener("submit", async (event) => {
   event.preventDefault();
   try {
     const payload = await api("/api/threads", {
       method: "POST",
-      body: JSON.stringify({ cwd: elements.cwdInput.value, model: elements.modelInput.value }),
+      body: JSON.stringify({
+        cwd: elements.cwdInput.value,
+        model: elements.modelInput.value,
+        effort: elements.effortInput.value,
+      }),
+    });
+    state.threadSettings.set(payload.thread.id, {
+      model: elements.modelInput.value,
+      effort: elements.effortInput.value,
     });
     elements.dialog.close();
     await loadThreads();
@@ -273,7 +505,7 @@ $("#rename-thread").addEventListener("click", async () => {
   try {
     await api(`/api/threads/${encodeURIComponent(state.selectedId)}`, { method: "PATCH", body: JSON.stringify({ name }) });
     await loadThreads();
-    await selectThread(state.selectedId);
+    await selectThread(state.selectedId, { follow: false });
   } catch (error) {
     showToast(error.message, "error");
   }
@@ -283,12 +515,7 @@ $("#archive-thread").addEventListener("click", async () => {
   if (!state.selectedId || !window.confirm("归档此对话？之后可以通过 Codex 恢复。")) return;
   try {
     await api(`/api/threads/${encodeURIComponent(state.selectedId)}/archive`, { method: "POST", body: "{}" });
-    state.selectedId = null;
-    state.selectedThread = null;
-    elements.header.classList.add("hidden");
-    elements.view.classList.add("hidden");
-    elements.composer.classList.add("hidden");
-    elements.empty.classList.remove("hidden");
+    clearSelection();
     await loadThreads();
   } catch (error) {
     showToast(error.message, "error");
@@ -299,17 +526,21 @@ $("#delete-thread").addEventListener("click", async () => {
   if (!state.selectedId || !window.confirm("永久删除此对话？此操作不可撤销。")) return;
   try {
     await api(`/api/threads/${encodeURIComponent(state.selectedId)}`, { method: "DELETE", body: "{}" });
-    state.selectedId = null;
-    state.selectedThread = null;
-    elements.header.classList.add("hidden");
-    elements.view.classList.add("hidden");
-    elements.composer.classList.add("hidden");
-    elements.empty.classList.remove("hidden");
+    clearSelection();
     await loadThreads();
   } catch (error) {
     showToast(error.message, "error");
   }
 });
+
+function clearSelection() {
+  state.selectedId = null;
+  state.selectedThread = null;
+  elements.header.classList.add("hidden");
+  elements.view.classList.add("hidden");
+  elements.composer.classList.add("hidden");
+  elements.empty.classList.remove("hidden");
+}
 
 const events = new EventSource("/api/events");
 events.addEventListener("codex", scheduleRefresh);
@@ -324,7 +555,9 @@ events.addEventListener("transport-error", () => refreshHealth().catch(() => und
 (async () => {
   try {
     await refreshHealth();
-    if (state.health?.ok) await loadThreads();
+    if (state.health?.ok) {
+      await Promise.all([loadModels(), loadThreads()]);
+    }
   } catch (error) {
     showToast(error.message, "error", 8000);
   }

@@ -66,6 +66,11 @@ async function handleApi(request, response, url) {
     return;
   }
 
+  if (request.method === "GET" && pathname === "/api/models") {
+    respondJson(response, 200, { data: await gateway.listModels() });
+    return;
+  }
+
   if (request.method === "GET" && pathname === "/api/events") {
     response.writeHead(200, {
       "Content-Type": "text/event-stream; charset=utf-8",
@@ -98,7 +103,7 @@ async function handleApi(request, response, url) {
     return;
   }
 
-  const match = /^\/api\/threads\/([^/]+)(?:\/(messages|interrupt|archive))?$/.exec(pathname);
+  const match = /^\/api\/threads\/([^/]+)(?:\/(messages|interrupt|archive|settings))?$/.exec(pathname);
   if (!match) {
     respondJson(response, 404, { error: "Not found" });
     return;
@@ -115,6 +120,12 @@ async function handleApi(request, response, url) {
   if (request.method === "PATCH" && !action) {
     const body = await readJson(request);
     respondJson(response, 200, { thread: await gateway.renameThread(threadId, body.name) });
+    return;
+  }
+
+  if (request.method === "PATCH" && action === "settings") {
+    const body = await readJson(request);
+    respondJson(response, 200, await gateway.updateThreadSettings(threadId, body));
     return;
   }
 
