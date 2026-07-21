@@ -1,0 +1,99 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="color-scheme" content="dark" />
+    <title>Codex WebUI</title>
+    <link rel="stylesheet" href="/styles.css" />
+  </head>
+  <body>
+    <main class="app-shell">
+      <aside class="sidebar">
+        <div class="brand-row">
+          <div class="brand-mark">C</div>
+          <div>
+            <strong>Codex WebUI</strong>
+            <span id="connection-status" class="connection-status">正在检查 Mac…</span>
+          </div>
+        </div>
+        <button id="new-thread" class="primary-button full-width">+ 新建对话</button>
+        <label class="search-field" for="search">
+          <span>⌕</span>
+          <input id="search" type="search" placeholder="搜索对话" autocomplete="off" />
+        </label>
+        <div class="thread-toolbar">
+          <span id="thread-count">0 个对话</span>
+          <button id="refresh-threads" class="icon-button" title="刷新对话">↻</button>
+        </div>
+        <nav id="thread-list" class="thread-list" aria-label="Codex 对话列表"></nav>
+      </aside>
+
+      <section class="workspace">
+        <header id="thread-header" class="thread-header hidden">
+          <div>
+            <p id="thread-cwd" class="eyebrow"></p>
+            <h1 id="thread-title"></h1>
+          </div>
+          <div class="thread-actions">
+            <button id="rename-thread" class="quiet-button">改名</button>
+            <button id="archive-thread" class="quiet-button">归档</button>
+            <button id="delete-thread" class="danger-button">删除</button>
+          </div>
+        </header>
+
+        <section id="empty-state" class="empty-state">
+          <div class="empty-orb">⌘</div>
+          <p class="eyebrow">远程控制台</p>
+          <h1>在这里管理你的 Codex 对话</h1>
+          <p>选择已有对话，或创建新线程。所有模型请求仍只在这台 Mac 上使用已有 Codex 配置执行。</p>
+          <button id="empty-new-thread" class="primary-button">开始新对话</button>
+        </section>
+
+        <section id="thread-view" class="thread-view hidden" aria-live="polite">
+          <div id="messages" class="messages"></div>
+          <div id="approval-notice" class="approval-notice hidden"></div>
+        </section>
+
+        <form id="composer" class="composer hidden">
+          <textarea id="message-input" rows="3" maxlength="30000" placeholder="给 Codex 发送指令…"></textarea>
+          <div class="composer-bottom">
+            <span id="turn-status" class="turn-status">准备就绪</span>
+            <div class="composer-actions">
+              <button id="interrupt-turn" class="quiet-button" type="button" disabled>停止</button>
+              <button class="primary-button" type="submit">发送 <span>↵</span></button>
+            </div>
+          </div>
+        </form>
+      </section>
+    </main>
+
+    <dialog id="new-thread-dialog" class="new-thread-dialog">
+      <form id="new-thread-form" method="dialog">
+        <div class="dialog-heading">
+          <div>
+            <p class="eyebrow">创建线程</p>
+            <h2>选择工作目录</h2>
+          </div>
+          <button id="close-dialog" class="icon-button" type="button" aria-label="关闭">×</button>
+        </div>
+        <label>
+          工作目录（绝对路径）
+          <input id="cwd-input" name="cwd" required placeholder="/Users/you/Code/Project/example" />
+        </label>
+        <label>
+          模型（可选，沿用 Codex 默认值）
+          <input id="model-input" name="model" placeholder="gpt-5.6-terra" />
+        </label>
+        <p class="dialog-note">新线程默认使用 <code>on-request</code> 审批策略。网页不会读取或保存 API 凭据。</p>
+        <div class="dialog-actions">
+          <button id="cancel-dialog" class="quiet-button" type="button">取消</button>
+          <button class="primary-button" type="submit">创建线程</button>
+        </div>
+      </form>
+    </dialog>
+
+    <div id="toast-region" class="toast-region" aria-live="polite"></div>
+    <script type="module" src="/app.js"></script>
+  </body>
+</html>
