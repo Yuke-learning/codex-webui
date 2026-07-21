@@ -93,6 +93,15 @@ button { cursor: pointer; }
 .message.tool { color: var(--muted); background: #15181d; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 12px; }
 .message-label { display: block; margin-bottom: 7px; color: var(--dim); font-size: 11px; font-weight: 750; letter-spacing: .08em; text-transform: uppercase; }
 .empty-messages { color: var(--muted); text-align: center; padding: 48px 0; }
+.automation-events { max-width: 880px; margin: 18px auto 0; border: 1px solid var(--line); border-radius: 8px; background: var(--panel); color: var(--muted); }
+.automation-events summary { display: flex; align-items: center; justify-content: space-between; min-height: 42px; padding: 0 13px; color: var(--text); cursor: pointer; font-size: 13px; font-weight: 700; }
+.automation-event-count { display: inline-grid; place-items: center; min-width: 22px; height: 22px; padding: 0 6px; border-radius: 11px; background: var(--panel-strong); color: var(--muted); font-size: 11px; }
+.automation-event-list { display: grid; gap: 8px; padding: 0 12px 12px; }
+.automation-event { padding: 10px 11px; border: 1px solid var(--line); border-radius: 6px; background: var(--assistant); }
+.automation-event-heading { display: flex; align-items: center; gap: 8px; min-width: 0; color: var(--muted); font-size: 12px; }
+.automation-event-kind { flex: 0 0 auto; color: var(--dim); font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 11px; text-transform: uppercase; }
+.automation-event-message { margin: 7px 0 0; color: var(--text); font-size: 13px; line-height: 1.55; white-space: pre-wrap; word-break: break-word; }
+.automation-event-repeat { display: block; margin-top: 7px; color: var(--dim); font-size: 11px; }
 .composer { max-width: 880px; width: calc(100% - 36px); margin: 16px auto 22px; border: 1px solid #373d47; border-radius: 13px; background: #1a1e24; box-shadow: 0 18px 60px #0008; }
 .composer textarea { display: block; resize: vertical; width: 100%; min-height: 82px; padding: 15px 16px 8px; border: 0; outline: 0; background: transparent; color: var(--text); }
 .composer-bottom { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 7px 8px 8px 16px; }
@@ -174,9 +183,11 @@ html[data-theme="liquid-glass"] .thread-settings,
 html[data-theme="liquid-glass"] .composer,
 html[data-theme="liquid-glass"] .new-thread-dialog,
 html[data-theme="liquid-glass"] .toast,
-html[data-theme="liquid-glass"] .theme-option { background: rgba(28, 34, 75, .58); }
+html[data-theme="liquid-glass"] .theme-option,
+html[data-theme="liquid-glass"] .automation-events { background: rgba(28, 34, 75, .58); }
 html[data-theme="liquid-glass"] .message.assistant,
-html[data-theme="liquid-glass"] .message.tool { background: rgba(17, 22, 54, .6); }
+html[data-theme="liquid-glass"] .message.tool,
+html[data-theme="liquid-glass"] .automation-event { background: rgba(17, 22, 54, .6); }
 html[data-theme="liquid-glass"] .new-thread-dialog input,
 html[data-theme="liquid-glass"] .new-thread-dialog select { background: rgba(9, 13, 34, .7); }
 html[data-theme="liquid-glass"] .composer { border-color: rgba(207, 223, 255, .32); box-shadow: 0 18px 60px rgba(3, 5, 24, .42); }

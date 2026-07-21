@@ -1,4 +1,15 @@
 import { classifyCodexEvent } from "./refresh-policy.js";
+import { toTranscript, transcriptSignature } from "./transcript.js";
+
+const THEME_IDS = new Set([
+  "default",
+  "liquid-glass",
+  "swiss-modernism",
+  "glassmorphism",
+  "real-time-monitoring",
+  "data-dense-dashboard",
+  "accessible-ethical",
+]);
 
 const state = {
   threads: [],
@@ -31,6 +42,9 @@ const elements = {
   empty: $("#empty-state"),
   view: $("#thread-view"),
   messages: $("#messages"),
+  automationEvents: $("#automation-events"),
+  automationEventCount: $("#automation-event-count"),
+  automationEventList: $("#automation-event-list"),
   composer: $("#composer"),
   messageInput: $("#message-input"),
   turnStatus: $("#turn-status"),
@@ -403,36 +417,59 @@ async function updateCurrentThreadSettings(changes) {
 }
 
 function renderMessages(thread, { follow = false } = {}) {
-  const signature = threadSignature(thread);
+  const transcript = toTranscript(thread);
+  const signature = transcriptSignature(transcript);
   if (signature === state.renderedThreadSignature) return;
   const shouldFollow = follow || isNearBottom(elements.view);
   elements.messages.replaceChildren();
-  const items = (thread.turns ?? []).flatMap((turn) => turn.items ?? []);
-  if (!items.length) {
+  if (!transcript.messages.length) {
     const empty = document.createElement("p");
     empty.className = "empty-messages";
     empty.textContent = "这个线程还没有可显示的消息。发送第一条指令开始吧。";
     elements.messages.append(empty);
-    state.renderedThreadSignature = signature;
-    return;
   }
-  for (const item of items) {
-    const text = itemText(item);
-    if (!text) continue;
-    elements.messages.append(messageNode(text, itemRole(item), itemLabel(item)));
-  }
+  for (const message of transcript.messages) elements.messages.append(messageNode(message.text, message.role, message.label));
+  renderAutomationEvents(transcript.automationEvents);
   state.renderedThreadSignature = signature;
   if (shouldFollow) elements.view.scrollTop = elements.view.scrollHeight;
 }
 
-function threadSignature(thread) {
-  return (thread.turns ?? []).map((turn) => {
-    const items = (turn.items ?? []).map((item) => {
-      const text = itemText(item);
-      return `${item.id ?? item.type ?? "item"}:${text.length}`;
-    });
-    return `${turn.id ?? "turn"}:${items.join(",")}`;
-  }).join("|");
+function renderAutomationEvents(events) {
+  elements.automationEventList.replaceChildren();
+  if (!events.length) {
+    elements.automationEvents.classList.add("hidden");
+    elements.automationEvents.open = false;
+    return;
+  }
+
+  elements.automationEventCount.textContent = String(events.length);
+  for (const event of events) {
+    const row = document.createElement("article");
+    row.className = "automation-event";
+    const heading = document.createElement("div");
+    heading.className = "automation-event-heading";
+    const type = document.createElement("span");
+    type.className = "automation-event-kind";
+    type.textContent = event.kind;
+    const source = document.createElement("span");
+    source.textContent = `${event.automationId} · ${event.decision}`;
+    heading.append(type, source);
+    row.append(heading);
+    if (event.message) {
+      const message = document.createElement("p");
+      message.className = "automation-event-message";
+      message.textContent = event.message;
+      row.append(message);
+    }
+    if (event.count > 1) {
+      const count = document.createElement("span");
+      count.className = "automation-event-repeat";
+      count.textContent = `相邻重复 ${event.count} 次`;
+      row.append(count);
+    }
+    elements.automationEventList.append(row);
+  }
+  elements.automationEvents.classList.remove("hidden");
 }
 
 function isNearBottom(element) {
@@ -449,30 +486,6 @@ function messageNode(text, role, label) {
   content.textContent = text;
   node.append(heading, content);
   return node;
-}
-
-function itemRole(item) {
-  const type = String(item.type ?? "").toLowerCase();
-  if (type.includes("user")) return "user";
-  if (type.includes("agent") || type.includes("assistant")) return "assistant";
-  return "tool";
-}
-
-function itemLabel(item) {
-  const role = itemRole(item);
-  return role === "user" ? "你" : role === "assistant" ? "Codex" : item.type ?? "事件";
-}
-
-function itemText(item) {
-  const direct = item.text ?? item.message ?? item.content;
-  if (typeof direct === "string") return direct;
-  if (Array.isArray(direct)) {
-    return direct.map((part) => part.text ?? part.content ?? "").filter(Boolean).join("\n");
-  }
-  const output = item.output ?? item.arguments ?? item.command;
-  if (typeof output === "string") return output;
-  if (output && typeof output === "object") return JSON.stringify(output, null, 2);
-  return "";
 }
 
 function threadTitle(thread) {
@@ -509,14 +522,14 @@ function showNewThreadDialog() {
 function loadThemePreference() {
   try {
     const theme = localStorage.getItem("codex-webui.theme.v1");
-    return theme === "liquid-glass" ? theme : "default";
+    return THEME_IDS.has(theme) ? theme : "default";
   } catch {
     return "default";
   }
 }
 
 function setTheme(theme) {
-  if (theme !== "default" && theme !== "liquid-glass") return;
+  if (!THEME_IDS.has(theme)) return;
   state.theme = theme;
   document.documentElement.dataset.theme = theme;
   for (const input of elements.themeOptions) {

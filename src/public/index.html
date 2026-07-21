@@ -67,6 +67,10 @@
 
         <section id="thread-view" class="thread-view hidden" aria-live="polite">
           <div id="messages" class="messages"></div>
+          <details id="automation-events" class="automation-events hidden">
+            <summary>自动化事件 <span id="automation-event-count" class="automation-event-count"></span></summary>
+            <div id="automation-event-list" class="automation-event-list"></div>
+          </details>
           <div id="approval-notice" class="approval-notice hidden"></div>
         </section>
 
@@ -106,6 +110,41 @@
                 <span class="theme-preview theme-preview-liquid" aria-hidden="true"><span></span><span></span></span>
                 <span class="theme-option-copy">
                   <strong>液态玻璃</strong>
+                </span>
+              </label>
+              <label class="theme-option" data-theme-option="swiss-modernism">
+                <input type="radio" name="theme" value="swiss-modernism" />
+                <span class="theme-preview theme-preview-swiss" aria-hidden="true"><span></span><span></span></span>
+                <span class="theme-option-copy">
+                  <strong>瑞士现代主义</strong>
+                </span>
+              </label>
+              <label class="theme-option" data-theme-option="glassmorphism">
+                <input type="radio" name="theme" value="glassmorphism" />
+                <span class="theme-preview theme-preview-glass" aria-hidden="true"><span></span><span></span></span>
+                <span class="theme-option-copy">
+                  <strong>毛玻璃</strong>
+                </span>
+              </label>
+              <label class="theme-option" data-theme-option="real-time-monitoring">
+                <input type="radio" name="theme" value="real-time-monitoring" />
+                <span class="theme-preview theme-preview-monitoring" aria-hidden="true"><span></span><span></span></span>
+                <span class="theme-option-copy">
+                  <strong>实时监控</strong>
+                </span>
+              </label>
+              <label class="theme-option" data-theme-option="data-dense-dashboard">
+                <input type="radio" name="theme" value="data-dense-dashboard" />
+                <span class="theme-preview theme-preview-dense" aria-hidden="true"><span></span><span></span></span>
+                <span class="theme-option-copy">
+                  <strong>数据密集仪表板</strong>
+                </span>
+              </label>
+              <label class="theme-option" data-theme-option="accessible-ethical">
+                <input type="radio" name="theme" value="accessible-ethical" />
+                <span class="theme-preview theme-preview-accessible" aria-hidden="true"><span></span><span></span></span>
+                <span class="theme-option-copy">
+                  <strong>高可访问性</strong>
                 </span>
               </label>
             </div>
