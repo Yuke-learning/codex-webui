@@ -26,11 +26,16 @@ const state = {
   renderedThreadSignature: null,
   activeView: "console",
   theme: loadThemePreference(),
+  mobileSidebarOpen: false,
 };
 
 const $ = (selector) => document.querySelector(selector);
 const elements = {
   status: $("#connection-status"),
+  sidebar: $("#sidebar"),
+  mobileSidebarToggle: $("#open-mobile-sidebar"),
+  mobileSidebarClose: $("#close-mobile-sidebar"),
+  mobileSidebarBackdrop: $("#mobile-sidebar-backdrop"),
   list: $("#thread-list"),
   count: $("#thread-count"),
   search: $("#search"),
@@ -246,6 +251,7 @@ function threadRow(thread) {
 async function selectThread(threadId, { follow = true } = {}) {
   const isNewSelection = state.selectedId !== threadId;
   state.selectedId = threadId;
+  setMobileSidebar(false);
   const requestId = ++state.detailRequestId;
   renderThreadList();
   if (isNewSelection) elements.messages.replaceChildren(messageNode("正在加载对话…", "tool", "状态"));
@@ -521,8 +527,26 @@ function relativeTime(timestamp) {
 }
 
 function showNewThreadDialog() {
+  setMobileSidebar(false);
   renderNewThreadSettings();
   if (typeof elements.dialog.showModal === "function") elements.dialog.showModal();
+}
+
+function isMobileViewport() {
+  return window.matchMedia?.("(max-width: 760px)").matches ?? false;
+}
+
+function setMobileSidebar(open) {
+  const shouldOpen = Boolean(open && isMobileViewport());
+  state.mobileSidebarOpen = shouldOpen;
+  document.body.classList.toggle("mobile-sidebar-open", shouldOpen);
+  elements.mobileSidebarToggle.setAttribute("aria-expanded", String(shouldOpen));
+  elements.mobileSidebarBackdrop.classList.toggle("hidden", !shouldOpen);
+  if (isMobileViewport()) {
+    elements.sidebar.setAttribute("aria-hidden", String(!shouldOpen));
+  } else {
+    elements.sidebar.removeAttribute("aria-hidden");
+  }
 }
 
 function loadThemePreference() {
@@ -625,7 +649,20 @@ $("#empty-new-thread").addEventListener("click", showNewThreadDialog);
 elements.settingsButton.addEventListener("click", () => {
   if (state.activeView === "settings") showConsole();
   else showSettings();
+  setMobileSidebar(false);
 });
+elements.mobileSidebarToggle.addEventListener("click", () => setMobileSidebar(!state.mobileSidebarOpen));
+elements.mobileSidebarClose.addEventListener("click", () => setMobileSidebar(false));
+elements.mobileSidebarBackdrop.addEventListener("click", () => setMobileSidebar(false));
+document.addEventListener("keydown", (event) => {
+  if (event.key === "Escape" && state.mobileSidebarOpen) setMobileSidebar(false);
+});
+const desktopViewport = window.matchMedia?.("(min-width: 761px)");
+const closeMobileSidebarOnDesktop = (event) => {
+  if (event.matches) setMobileSidebar(false);
+};
+if (desktopViewport?.addEventListener) desktopViewport.addEventListener("change", closeMobileSidebarOnDesktop);
+else desktopViewport?.addListener?.(closeMobileSidebarOnDesktop);
 elements.closeSettings.addEventListener("click", showConsole);
 for (const input of elements.themeOptions) {
   input.addEventListener("change", () => setTheme(input.value));
@@ -771,6 +808,7 @@ events.addEventListener("transport-error", () => refreshHealth().catch(() => und
 (async () => {
   try {
     setTheme(state.theme);
+    setMobileSidebar(false);
     await refreshHealth();
     if (state.health?.ok) {
       await Promise.all([loadModels(), loadThreads()]);

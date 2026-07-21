@@ -35,6 +35,7 @@ body { margin: 0; min-width: 320px; background: var(--bg); color: var(--text); }
 button, input, select, textarea { font: inherit; }
 button { cursor: pointer; }
 .hidden { display: none !important; }
+.mobile-sidebar-toggle, .mobile-sidebar-close, .mobile-sidebar-backdrop { display: none; }
 
 .app-shell { display: grid; grid-template-columns: 316px minmax(0, 1fr); height: 100dvh; min-height: 0; overflow: hidden; }
 .sidebar { display: flex; flex-direction: column; gap: 15px; min-width: 0; min-height: 0; padding: 20px 14px; overflow: hidden; background: var(--nav-sidebar-bg); border-right: 1px solid var(--line); }
@@ -611,17 +612,40 @@ html[data-theme="accessible-ethical"] :focus-visible { outline: 3px solid #ffe60
 }
 
 @media (max-width: 760px) {
-  .app-shell { grid-template-columns: 1fr; grid-template-rows: minmax(196px, 42vh) minmax(0, 1fr); }
-  .sidebar { min-height: 0; padding: 14px; border-right: 0; border-bottom: 1px solid var(--line); }
-  .thread-header { align-items: flex-start; padding: 14px 16px; }
-  .header-controls, .thread-actions { flex-wrap: wrap; justify-content: flex-end; }
+  .app-shell { position: relative; display: block; min-height: 100dvh; }
+  .workspace { min-height: 100dvh; height: 100dvh; grid-template-rows: auto minmax(0, 1fr) auto; }
+  .sidebar { position: fixed; z-index: 30; top: 0; bottom: 0; left: 0; width: min(360px, calc(100vw - 48px)); min-height: 100dvh; padding: 16px 12px calc(16px + env(safe-area-inset-bottom)); border-right: 1px solid var(--line); border-bottom: 0; box-shadow: 20px 0 48px #0008; transform: translateX(-105%); visibility: hidden; pointer-events: none; transition: transform .2s ease, visibility .2s ease; }
+  body.mobile-sidebar-open .sidebar { transform: translateX(0); visibility: visible; pointer-events: auto; }
+  .mobile-sidebar-backdrop { position: fixed; z-index: 20; inset: 0; border: 0; background: #0009; }
+  .mobile-sidebar-toggle { position: fixed; z-index: 10; top: calc(12px + env(safe-area-inset-top)); left: 12px; display: grid; place-items: center; width: 36px; height: 36px; border: 1px solid var(--line); border-radius: 7px; background: var(--panel); color: var(--text); font-size: 18px; line-height: 1; box-shadow: 0 8px 22px #0005; }
+  body.mobile-sidebar-open .mobile-sidebar-toggle { opacity: 0; pointer-events: none; }
+  .mobile-sidebar-close { display: grid; place-items: center; flex: 0 0 auto; font-size: 22px; }
+  .thread-header { align-items: flex-start; gap: 12px; min-height: 0; padding: calc(12px + env(safe-area-inset-top)) 16px 12px 58px; }
+  .thread-header > div:first-child { width: 100%; min-width: 0; }
+  .thread-header h1 { font-size: 16px; }
+  .header-controls { width: 100%; justify-content: flex-start; gap: 8px; }
   .thread-settings { order: 2; width: 100%; }
+  .thread-actions { width: 100%; flex-wrap: nowrap; }
+  .thread-actions button { flex: 1; min-width: 0; padding: 0 8px; }
   .select-control { flex: 1; min-width: 0; }
-  .thread-view { padding: 18px; }
-  .composer { width: calc(100% - 20px); margin-bottom: 10px; }
+  .select-control select { width: 100%; max-width: none; }
+  .empty-state { padding: 72px 22px 28px; }
+  .thread-view { padding: 16px 14px; }
+  .messages { gap: 14px; }
+  .message { padding: 13px 14px; border-radius: 8px; }
+  .composer { width: calc(100% - 20px); margin: 8px auto calc(10px + env(safe-area-inset-bottom)); border-radius: 8px; }
+  .composer textarea { min-height: 68px; }
+  .composer-bottom { padding-left: 12px; }
   .message.user { max-width: 92%; }
-  .settings-view { padding: 24px 18px; }
+  .settings-view { padding: calc(64px + env(safe-area-inset-top)) 18px 24px; }
   .settings-header { margin-bottom: 28px; }
   .theme-options { grid-template-columns: 1fr; }
   html[data-theme="data-dense-dashboard"] .app-shell { grid-template-columns: 1fr; }
+}
+
+@media (max-width: 420px) {
+  .sidebar { width: calc(100vw - 36px); }
+  .thread-actions button { font-size: 12px; }
+  .composer-actions { gap: 5px; }
+  .composer-actions .primary-button { padding: 0 11px; }
 }
