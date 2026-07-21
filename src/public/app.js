@@ -13,6 +13,8 @@ const state = {
   listRequestId: 0,
   detailRequestId: 0,
   renderedThreadSignature: null,
+  activeView: "console",
+  theme: loadThemePreference(),
 };
 
 const $ = (selector) => document.querySelector(selector);
@@ -34,6 +36,10 @@ const elements = {
   turnStatus: $("#turn-status"),
   interrupt: $("#interrupt-turn"),
   approval: $("#approval-notice"),
+  settingsButton: $("#open-settings"),
+  settingsView: $("#settings-view"),
+  closeSettings: $("#close-settings"),
+  themeOptions: document.querySelectorAll("input[name=theme]"),
   dialog: $("#new-thread-dialog"),
   newThreadForm: $("#new-thread-form"),
   cwdInput: $("#cwd-input"),
@@ -251,7 +257,7 @@ async function refreshSelectedThread({ follow = false } = {}) {
 
 function renderSelectedThread({ follow = false } = {}) {
   const thread = state.selectedThread;
-  if (!thread) return;
+  if (!thread || state.activeView !== "console") return;
   elements.empty.classList.add("hidden");
   elements.header.classList.remove("hidden");
   elements.view.classList.remove("hidden");
@@ -500,6 +506,54 @@ function showNewThreadDialog() {
   if (typeof elements.dialog.showModal === "function") elements.dialog.showModal();
 }
 
+function loadThemePreference() {
+  try {
+    const theme = localStorage.getItem("codex-webui.theme.v1");
+    return theme === "liquid-glass" ? theme : "default";
+  } catch {
+    return "default";
+  }
+}
+
+function setTheme(theme) {
+  if (theme !== "default" && theme !== "liquid-glass") return;
+  state.theme = theme;
+  document.documentElement.dataset.theme = theme;
+  for (const input of elements.themeOptions) {
+    const selected = input.value === theme;
+    input.checked = selected;
+    input.closest(".theme-option")?.classList.toggle("is-selected", selected);
+  }
+  try {
+    localStorage.setItem("codex-webui.theme.v1", theme);
+  } catch {
+    // The chosen theme remains active when browser storage is unavailable.
+  }
+}
+
+function showSettings() {
+  state.activeView = "settings";
+  elements.header.classList.add("hidden");
+  elements.empty.classList.add("hidden");
+  elements.view.classList.add("hidden");
+  elements.composer.classList.add("hidden");
+  elements.settingsView.classList.remove("hidden");
+  elements.settingsButton.classList.add("active");
+  elements.settingsButton.setAttribute("aria-pressed", "true");
+}
+
+function showConsole() {
+  state.activeView = "console";
+  elements.settingsView.classList.add("hidden");
+  elements.settingsButton.classList.remove("active");
+  elements.settingsButton.setAttribute("aria-pressed", "false");
+  if (state.selectedThread) {
+    renderSelectedThread({ follow: false });
+  } else {
+    elements.empty.classList.remove("hidden");
+  }
+}
+
 function showToast(message, kind = "info", duration = 4200) {
   const toast = document.createElement("div");
   toast.className = `toast ${kind}`;
@@ -549,6 +603,14 @@ function handleCodexEvent(event) {
 
 $("#new-thread").addEventListener("click", showNewThreadDialog);
 $("#empty-new-thread").addEventListener("click", showNewThreadDialog);
+elements.settingsButton.addEventListener("click", () => {
+  if (state.activeView === "settings") showConsole();
+  else showSettings();
+});
+elements.closeSettings.addEventListener("click", showConsole);
+for (const input of elements.themeOptions) {
+  input.addEventListener("change", () => setTheme(input.value));
+}
 $("#close-dialog").addEventListener("click", () => elements.dialog.close());
 $("#cancel-dialog").addEventListener("click", () => elements.dialog.close());
 $("#refresh-threads").addEventListener("click", () => loadThreads().catch((error) => showToast(error.message, "error")));
@@ -663,10 +725,12 @@ function clearSelection() {
   state.selectedId = null;
   state.selectedThread = null;
   state.renderedThreadSignature = null;
-  elements.header.classList.add("hidden");
-  elements.view.classList.add("hidden");
-  elements.composer.classList.add("hidden");
-  elements.empty.classList.remove("hidden");
+  if (state.activeView === "console") {
+    elements.header.classList.add("hidden");
+    elements.view.classList.add("hidden");
+    elements.composer.classList.add("hidden");
+    elements.empty.classList.remove("hidden");
+  }
 }
 
 const events = new EventSource("/api/events");
@@ -687,6 +751,7 @@ events.addEventListener("transport-error", () => refreshHealth().catch(() => und
 
 (async () => {
   try {
+    setTheme(state.theme);
     await refreshHealth();
     if (state.health?.ok) {
       await Promise.all([loadModels(), loadThreads()]);
