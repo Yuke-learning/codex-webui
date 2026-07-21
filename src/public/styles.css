@@ -128,6 +128,25 @@ button { cursor: pointer; }
 .theme-preview-liquid::before { position: absolute; width: 52px; height: 52px; top: -17px; right: -9px; border-radius: 50%; background: #5bc9f5; filter: blur(15px); content: ""; }
 .theme-preview-liquid span:first-child { background: rgba(27, 31, 75, .64); border: 1px solid rgba(237, 247, 255, .28); backdrop-filter: blur(4px); }
 .theme-preview-liquid span:last-child { background: rgba(229, 234, 255, .72); }
+.theme-preview-swiss { border-color: #242424; background: #f7f6f2; }
+.theme-preview-swiss::before { position: absolute; top: 0; bottom: 0; left: 11px; width: 12px; background: #eb2636; content: ""; }
+.theme-preview-swiss span:first-child { top: 9px; right: 8px; bottom: 29px; left: 31px; border-radius: 0; background: #171717; }
+.theme-preview-swiss span:last-child { right: 8px; bottom: 9px; left: 31px; border-radius: 0; background: #f0c72e; }
+.theme-preview-glass { border-color: #77b1d2; background: linear-gradient(135deg, #07355a, #0d6585 52%, #304879); }
+.theme-preview-glass::before { position: absolute; top: -16px; right: -5px; width: 52px; height: 52px; border-radius: 50%; background: #85e5ff; filter: blur(16px); content: ""; }
+.theme-preview-glass span:first-child { background: rgba(239, 251, 255, .28); border: 1px solid rgba(255, 255, 255, .6); backdrop-filter: blur(4px); }
+.theme-preview-glass span:last-child { background: rgba(239, 251, 255, .66); }
+.theme-preview-monitoring { border-color: #244e57; background: #091518; }
+.theme-preview-monitoring::before { position: absolute; inset: 0; background-image: linear-gradient(rgba(101, 171, 179, .12) 1px, transparent 1px), linear-gradient(90deg, rgba(101, 171, 179, .12) 1px, transparent 1px); background-size: 14px 14px; content: ""; }
+.theme-preview-monitoring span:first-child { background: #153239; border-left: 3px solid #38e29a; }
+.theme-preview-monitoring span:last-child { background: #38e29a; }
+.theme-preview-dense { border-color: #8a99a5; background: #eef2f4; }
+.theme-preview-dense::before { position: absolute; inset: 9px 7px 8px; background-image: linear-gradient(90deg, #ccd5db 1px, transparent 1px), linear-gradient(#ccd5db 1px, transparent 1px); background-size: 17px 14px; content: ""; }
+.theme-preview-dense span:first-child { top: 15px; right: 40px; bottom: 15px; left: 10px; border-radius: 1px; background: #2563eb; }
+.theme-preview-dense span:last-child { right: 10px; bottom: 15px; left: 49px; border-radius: 1px; background: #18a777; }
+.theme-preview-accessible { border-color: #fff; background: #000; }
+.theme-preview-accessible span:first-child { border: 2px solid #fff; border-radius: 0; background: #000; }
+.theme-preview-accessible span:last-child { border-radius: 0; background: #ffe600; }
 .theme-option-copy { display: grid; gap: 4px; min-width: 0; }
 .theme-option-copy strong { font-size: 14px; }
 
@@ -195,14 +214,300 @@ html[data-theme="liquid-glass"] .primary-button { background: #c2e8ff; }
 html[data-theme="liquid-glass"] .primary-button:hover { background: #d7f1ff; }
 html[data-theme="liquid-glass"] .approval-notice { border-color: rgba(255, 205, 105, .52); background: rgba(83, 55, 22, .58); }
 
+html[data-theme="swiss-modernism"],
+html[data-theme="glassmorphism"],
+html[data-theme="real-time-monitoring"],
+html[data-theme="data-dense-dashboard"],
+html[data-theme="accessible-ethical"] {
+  --theme-sidebar: var(--panel);
+  --theme-workspace: var(--bg);
+  --theme-hover: var(--panel-strong);
+  --theme-selected: var(--panel-strong);
+  --theme-selected-line: var(--accent);
+  --theme-surface: var(--panel);
+  --theme-tool: var(--panel-strong);
+  --theme-field: var(--bg);
+  --theme-composer-line: var(--line);
+  --theme-shadow: 0 18px 60px rgba(0, 0, 0, .22);
+  --theme-approval-bg: var(--panel-strong);
+  --theme-approval-line: var(--accent);
+  --theme-approval-text: var(--text);
+  --theme-accent-hover: var(--accent);
+}
+
+html[data-theme="swiss-modernism"] {
+  color-scheme: light;
+  --bg: #f4f3ef;
+  --panel: #ffffff;
+  --panel-strong: #e8e7e1;
+  --line: #1f1f1f;
+  --text: #111111;
+  --muted: #515151;
+  --dim: #6b6b6b;
+  --accent: #e52f3b;
+  --accent-ink: #ffffff;
+  --danger: #bd1624;
+  --user: #f0c82d;
+  --assistant: #ffffff;
+  --theme-workspace: linear-gradient(90deg, transparent 0 72%, rgba(229, 47, 59, .09) 72% 100%);
+  --theme-selected: #f0c82d;
+  --theme-selected-line: #111111;
+  --theme-field: #ffffff;
+  --theme-shadow: 8px 8px 0 #111111;
+  --theme-approval-bg: #fff6c8;
+  --theme-approval-line: #a97800;
+  --theme-approval-text: #302200;
+  --theme-accent-hover: #c8212d;
+}
+
+html[data-theme="glassmorphism"] {
+  --bg: #0d283c;
+  --panel: rgba(14, 53, 78, .48);
+  --panel-strong: rgba(65, 136, 173, .44);
+  --line: rgba(221, 248, 255, .32);
+  --text: #f0fbff;
+  --muted: #c4e5ef;
+  --dim: #8fbcc9;
+  --accent: #7ce7ff;
+  --accent-ink: #092434;
+  --danger: #ffbac5;
+  --user: rgba(28, 132, 167, .5);
+  --assistant: rgba(8, 53, 78, .54);
+  --theme-sidebar: rgba(6, 35, 57, .46);
+  --theme-workspace: linear-gradient(125deg, rgba(11, 53, 80, .72), rgba(18, 85, 107, .54) 48%, rgba(42, 65, 111, .62));
+  --theme-hover: rgba(178, 244, 255, .14);
+  --theme-selected: rgba(178, 244, 255, .14);
+  --theme-selected-line: rgba(230, 251, 255, .52);
+  --theme-surface: rgba(14, 65, 93, .52);
+  --theme-tool: rgba(5, 42, 65, .54);
+  --theme-field: rgba(5, 38, 59, .68);
+  --theme-composer-line: rgba(224, 250, 255, .46);
+  --theme-shadow: 0 18px 60px rgba(1, 20, 33, .35);
+  --theme-approval-bg: rgba(79, 61, 22, .6);
+  --theme-approval-line: rgba(255, 216, 124, .6);
+  --theme-accent-hover: #c5f7ff;
+}
+
+html[data-theme="real-time-monitoring"] {
+  --bg: #071216;
+  --panel: #0b1d22;
+  --panel-strong: #14343b;
+  --line: #24505a;
+  --text: #ecfff9;
+  --muted: #b4d7d1;
+  --dim: #789e99;
+  --accent: #38e29a;
+  --accent-ink: #062116;
+  --danger: #ff9a9a;
+  --user: #103f4c;
+  --assistant: #0a252b;
+  --theme-sidebar: #09191e;
+  --theme-workspace: linear-gradient(rgba(94, 180, 180, .055) 1px, transparent 1px), linear-gradient(90deg, rgba(94, 180, 180, .055) 1px, transparent 1px), #071216;
+  --theme-hover: #12343b;
+  --theme-selected: #12343b;
+  --theme-selected-line: #2d8d8c;
+  --theme-surface: #0c252b;
+  --theme-tool: #081b20;
+  --theme-field: #061419;
+  --theme-composer-line: #2d6570;
+  --theme-approval-bg: #33210d;
+  --theme-approval-line: #d88f32;
+  --theme-approval-text: #ffd69a;
+}
+
+html[data-theme="data-dense-dashboard"] {
+  color-scheme: light;
+  --bg: #eef2f4;
+  --panel: #ffffff;
+  --panel-strong: #e2e8ec;
+  --line: #bdc9d0;
+  --text: #17232c;
+  --muted: #536571;
+  --dim: #71828d;
+  --accent: #2563eb;
+  --accent-ink: #ffffff;
+  --danger: #c72c41;
+  --user: #dce8ff;
+  --assistant: #ffffff;
+  --theme-sidebar: #ffffff;
+  --theme-workspace: #f5f7f8;
+  --theme-hover: #e8eef1;
+  --theme-selected: #dce8ff;
+  --theme-selected-line: #8eb3f7;
+  --theme-tool: #e7edef;
+  --theme-field: #ffffff;
+  --theme-composer-line: #b6c4cc;
+  --theme-shadow: 0 10px 24px rgba(53, 75, 87, .14);
+  --theme-approval-bg: #fff3d6;
+  --theme-approval-line: #d18b24;
+  --theme-approval-text: #5f3b00;
+  --theme-accent-hover: #1d4ed8;
+}
+
+html[data-theme="accessible-ethical"] {
+  --bg: #000000;
+  --panel: #000000;
+  --panel-strong: #202020;
+  --line: #ffffff;
+  --text: #ffffff;
+  --muted: #ffffff;
+  --dim: #e5e5e5;
+  --accent: #ffe600;
+  --accent-ink: #000000;
+  --danger: #ff9797;
+  --user: #123b67;
+  --assistant: #151515;
+  --theme-sidebar: #000000;
+  --theme-workspace: #000000;
+  --theme-hover: #262626;
+  --theme-selected: #1b3150;
+  --theme-selected-line: #ffe600;
+  --theme-surface: #000000;
+  --theme-tool: #1a1a1a;
+  --theme-field: #000000;
+  --theme-approval-bg: #171300;
+  --theme-approval-line: #ffe600;
+}
+
+html[data-theme="swiss-modernism"] body,
+html[data-theme="glassmorphism"] body,
+html[data-theme="real-time-monitoring"] body,
+html[data-theme="data-dense-dashboard"] body,
+html[data-theme="accessible-ethical"] body { background: var(--bg); }
+html[data-theme="swiss-modernism"] .sidebar,
+html[data-theme="glassmorphism"] .sidebar,
+html[data-theme="real-time-monitoring"] .sidebar,
+html[data-theme="data-dense-dashboard"] .sidebar,
+html[data-theme="accessible-ethical"] .sidebar,
+html[data-theme="swiss-modernism"] .project-heading,
+html[data-theme="glassmorphism"] .project-heading,
+html[data-theme="real-time-monitoring"] .project-heading,
+html[data-theme="data-dense-dashboard"] .project-heading,
+html[data-theme="accessible-ethical"] .project-heading,
+html[data-theme="swiss-modernism"] .project-toggle,
+html[data-theme="glassmorphism"] .project-toggle,
+html[data-theme="real-time-monitoring"] .project-toggle,
+html[data-theme="data-dense-dashboard"] .project-toggle,
+html[data-theme="accessible-ethical"] .project-toggle { background: var(--theme-sidebar); }
+html[data-theme="swiss-modernism"] .workspace,
+html[data-theme="glassmorphism"] .workspace,
+html[data-theme="real-time-monitoring"] .workspace,
+html[data-theme="data-dense-dashboard"] .workspace,
+html[data-theme="accessible-ethical"] .workspace { background: var(--theme-workspace); }
+html[data-theme="glassmorphism"] .sidebar,
+html[data-theme="glassmorphism"] .workspace { backdrop-filter: blur(16px) saturate(1.15); }
+html[data-theme="swiss-modernism"] .project-toggle:hover,
+html[data-theme="glassmorphism"] .project-toggle:hover,
+html[data-theme="real-time-monitoring"] .project-toggle:hover,
+html[data-theme="data-dense-dashboard"] .project-toggle:hover,
+html[data-theme="accessible-ethical"] .project-toggle:hover,
+html[data-theme="swiss-modernism"] .thread-row:hover,
+html[data-theme="glassmorphism"] .thread-row:hover,
+html[data-theme="real-time-monitoring"] .thread-row:hover,
+html[data-theme="data-dense-dashboard"] .thread-row:hover,
+html[data-theme="accessible-ethical"] .thread-row:hover { background: var(--theme-hover); }
+html[data-theme="swiss-modernism"] .thread-row.selected,
+html[data-theme="glassmorphism"] .thread-row.selected,
+html[data-theme="real-time-monitoring"] .thread-row.selected,
+html[data-theme="data-dense-dashboard"] .thread-row.selected,
+html[data-theme="accessible-ethical"] .thread-row.selected { border-color: var(--theme-selected-line); background: var(--theme-selected); }
+html[data-theme="swiss-modernism"] .project-count,
+html[data-theme="glassmorphism"] .project-count,
+html[data-theme="real-time-monitoring"] .project-count,
+html[data-theme="data-dense-dashboard"] .project-count,
+html[data-theme="accessible-ethical"] .project-count,
+html[data-theme="swiss-modernism"] .search-field,
+html[data-theme="glassmorphism"] .search-field,
+html[data-theme="real-time-monitoring"] .search-field,
+html[data-theme="data-dense-dashboard"] .search-field,
+html[data-theme="accessible-ethical"] .search-field,
+html[data-theme="swiss-modernism"] .thread-settings,
+html[data-theme="glassmorphism"] .thread-settings,
+html[data-theme="real-time-monitoring"] .thread-settings,
+html[data-theme="data-dense-dashboard"] .thread-settings,
+html[data-theme="accessible-ethical"] .thread-settings,
+html[data-theme="swiss-modernism"] .composer,
+html[data-theme="glassmorphism"] .composer,
+html[data-theme="real-time-monitoring"] .composer,
+html[data-theme="data-dense-dashboard"] .composer,
+html[data-theme="accessible-ethical"] .composer,
+html[data-theme="swiss-modernism"] .new-thread-dialog,
+html[data-theme="glassmorphism"] .new-thread-dialog,
+html[data-theme="real-time-monitoring"] .new-thread-dialog,
+html[data-theme="data-dense-dashboard"] .new-thread-dialog,
+html[data-theme="accessible-ethical"] .new-thread-dialog,
+html[data-theme="swiss-modernism"] .toast,
+html[data-theme="glassmorphism"] .toast,
+html[data-theme="real-time-monitoring"] .toast,
+html[data-theme="data-dense-dashboard"] .toast,
+html[data-theme="accessible-ethical"] .toast,
+html[data-theme="swiss-modernism"] .theme-option,
+html[data-theme="glassmorphism"] .theme-option,
+html[data-theme="real-time-monitoring"] .theme-option,
+html[data-theme="data-dense-dashboard"] .theme-option,
+html[data-theme="accessible-ethical"] .theme-option,
+html[data-theme="swiss-modernism"] .automation-events,
+html[data-theme="glassmorphism"] .automation-events,
+html[data-theme="real-time-monitoring"] .automation-events,
+html[data-theme="data-dense-dashboard"] .automation-events,
+html[data-theme="accessible-ethical"] .automation-events { background: var(--theme-surface); }
+html[data-theme="swiss-modernism"] .message.tool,
+html[data-theme="glassmorphism"] .message.tool,
+html[data-theme="real-time-monitoring"] .message.tool,
+html[data-theme="data-dense-dashboard"] .message.tool,
+html[data-theme="accessible-ethical"] .message.tool { background: var(--theme-tool); }
+html[data-theme="swiss-modernism"] .new-thread-dialog input,
+html[data-theme="glassmorphism"] .new-thread-dialog input,
+html[data-theme="real-time-monitoring"] .new-thread-dialog input,
+html[data-theme="data-dense-dashboard"] .new-thread-dialog input,
+html[data-theme="accessible-ethical"] .new-thread-dialog input,
+html[data-theme="swiss-modernism"] .new-thread-dialog select,
+html[data-theme="glassmorphism"] .new-thread-dialog select,
+html[data-theme="real-time-monitoring"] .new-thread-dialog select,
+html[data-theme="data-dense-dashboard"] .new-thread-dialog select,
+html[data-theme="accessible-ethical"] .new-thread-dialog select { background: var(--theme-field); }
+html[data-theme="swiss-modernism"] .composer,
+html[data-theme="glassmorphism"] .composer,
+html[data-theme="real-time-monitoring"] .composer,
+html[data-theme="data-dense-dashboard"] .composer,
+html[data-theme="accessible-ethical"] .composer { border-color: var(--theme-composer-line); box-shadow: var(--theme-shadow); }
+html[data-theme="swiss-modernism"] .primary-button:hover,
+html[data-theme="glassmorphism"] .primary-button:hover,
+html[data-theme="real-time-monitoring"] .primary-button:hover,
+html[data-theme="data-dense-dashboard"] .primary-button:hover,
+html[data-theme="accessible-ethical"] .primary-button:hover { background: var(--theme-accent-hover); }
+html[data-theme="swiss-modernism"] .approval-notice,
+html[data-theme="glassmorphism"] .approval-notice,
+html[data-theme="real-time-monitoring"] .approval-notice,
+html[data-theme="data-dense-dashboard"] .approval-notice,
+html[data-theme="accessible-ethical"] .approval-notice { border-color: var(--theme-approval-line); background: var(--theme-approval-bg); color: var(--theme-approval-text); }
+html[data-theme="real-time-monitoring"] .status-dot.running { animation: status-pulse 2s ease-in-out infinite; }
+html[data-theme="data-dense-dashboard"] .app-shell { grid-template-columns: 280px minmax(0, 1fr); }
+html[data-theme="data-dense-dashboard"] .sidebar { gap: 10px; padding: 14px 10px; }
+html[data-theme="data-dense-dashboard"] .thread-row { padding: 8px; border-radius: 6px; }
+html[data-theme="data-dense-dashboard"] .message { padding: 12px 14px; border-radius: 8px; }
+html[data-theme="accessible-ethical"] .quiet-button,
+html[data-theme="accessible-ethical"] .danger-button { border-color: #ffffff; }
+html[data-theme="accessible-ethical"] button,
+html[data-theme="accessible-ethical"] input,
+html[data-theme="accessible-ethical"] select,
+html[data-theme="accessible-ethical"] textarea { min-height: 44px; }
+html[data-theme="accessible-ethical"] .icon-button { width: 44px; }
+html[data-theme="accessible-ethical"] :focus-visible { outline: 3px solid #ffe600; outline-offset: 3px; }
+
 @keyframes glass-drift {
   from { transform: translate3d(-4%, -3%, 0) scale(.96); }
   to { transform: translate3d(6%, 5%, 0) scale(1.06); }
 }
 
+@keyframes status-pulse {
+  50% { box-shadow: 0 0 0 5px rgba(56, 226, 154, .22); }
+}
+
 @media (prefers-reduced-motion: reduce) {
   html[data-theme="liquid-glass"] .app-shell::before,
-  html[data-theme="liquid-glass"] .app-shell::after { animation: none; }
+  html[data-theme="liquid-glass"] .app-shell::after,
+  html[data-theme="real-time-monitoring"] .status-dot.running { animation: none; }
 }
 
 @media (max-width: 760px) {
@@ -218,4 +523,5 @@ html[data-theme="liquid-glass"] .approval-notice { border-color: rgba(255, 205, 
   .settings-view { padding: 24px 18px; }
   .settings-header { margin-bottom: 28px; }
   .theme-options { grid-template-columns: 1fr; }
+  html[data-theme="data-dense-dashboard"] .app-shell { grid-template-columns: 1fr; }
 }
