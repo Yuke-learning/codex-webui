@@ -105,11 +105,9 @@ function renderThreadList() {
 
   for (const [groupIndex, group] of groupThreads(state.threads).entries()) {
     const section = document.createElement("section");
-    const containsSelectedThread = group.threads.some((thread) => thread.id === state.selectedId);
-    const collapsed = state.collapsedProjectKeys.has(group.key) && !containsSelectedThread;
+    const collapsed = state.collapsedProjectKeys.has(group.key);
     const isUngrouped = group.key === "other";
     const rowsId = `project-threads-${groupIndex}`;
-    if (containsSelectedThread) state.collapsedProjectKeys.delete(group.key);
     section.className = `project-group${collapsed ? " is-collapsed" : ""}${isUngrouped ? " is-ungrouped" : ""}`;
     section.setAttribute("aria-label", `${group.name}，${group.threads.length} 个对话`);
 
