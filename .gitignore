@@ -1,0 +1,21 @@
+# Dependencies and build output
+node_modules/
+.next/
+dist/
+coverage/
+
+# Local configuration and secrets
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+secrets/
+
+# Local runtime state and logs
+data/
+logs/
+*.log
+
+# macOS
+.DS_Store
