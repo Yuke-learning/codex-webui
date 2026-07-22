@@ -21,6 +21,10 @@
           <button id="open-settings" class="icon-button settings-button" type="button" title="设置" aria-label="设置" aria-pressed="false">&#9881;</button>
           <button id="close-mobile-sidebar" class="icon-button mobile-sidebar-close" type="button" title="关闭对话列表" aria-label="关闭对话列表">×</button>
         </div>
+        <button id="provider-switch" class="provider-control sidebar-provider-control" type="button" disabled aria-label="切换全局服务商" title="正在检测 CC Switch">
+          <span>全局服务商</span>
+          <strong id="provider-switch-label">检测中…</strong>
+        </button>
         <button id="new-thread" class="primary-button full-width">+ 新建对话</button>
         <label class="search-field" for="search">
           <span>⌕</span>
@@ -36,13 +40,7 @@
       </aside>
 
       <section class="workspace">
-        <div class="global-toolbar">
-          <button id="open-mobile-sidebar" class="icon-button mobile-sidebar-toggle" type="button" title="打开对话列表" aria-label="打开对话列表" aria-controls="sidebar" aria-expanded="false">☰</button>
-          <button id="provider-switch" class="provider-control global-provider-control" type="button" disabled aria-label="切换全局服务商" title="正在检测 CC Switch">
-            <span>全局服务商</span>
-            <strong id="provider-switch-label">检测中…</strong>
-          </button>
-        </div>
+        <button id="open-mobile-sidebar" class="icon-button mobile-sidebar-toggle" type="button" title="打开对话列表" aria-label="打开对话列表" aria-controls="sidebar" aria-expanded="false">☰</button>
         <header id="thread-header" class="thread-header hidden">
           <div>
             <p id="thread-cwd" class="eyebrow"></p>
@@ -106,10 +104,25 @@
           <header class="settings-header">
             <div>
               <p class="eyebrow">设置</p>
-              <h1 id="settings-title">外观</h1>
+              <h1 id="settings-title">设置</h1>
             </div>
             <button id="close-settings" class="quiet-button" type="button">返回控制台</button>
           </header>
+          <section class="settings-section" aria-labelledby="preference-setting-title">
+            <div class="settings-section-heading">
+              <h2 id="preference-setting-title">偏好设置</h2>
+            </div>
+            <label class="preference-option" for="show-cc-switch">
+              <span class="preference-option-copy">
+                <strong>在主页显示 CC Switch 按钮</strong>
+                <span>关闭后只隐藏左侧栏入口，不影响服务商检测与当前配置。</span>
+              </span>
+              <span class="preference-switch">
+                <input id="show-cc-switch" type="checkbox" />
+                <span class="preference-switch-track" aria-hidden="true"></span>
+              </span>
+            </label>
+          </section>
           <section class="settings-section" aria-labelledby="theme-setting-title">
             <div class="settings-section-heading">
               <h2 id="theme-setting-title">主题</h2>

@@ -1,5 +1,6 @@
 import { classifyCodexEvent } from "./refresh-policy.js";
 import { describeLiveActivity } from "./live-activity.js";
+import { loadCcSwitchVisibility, saveCcSwitchVisibility } from "./preferences.js";
 import { appendRichContent } from "./rich-content.js";
 import { toTranscript, transcriptSignature } from "./transcript.js";
 import { parseCodexUiSegments } from "./ui-directives.js";
@@ -40,6 +41,7 @@ const state = {
   renderedThreadSignature: null,
   activeView: "console",
   theme: loadThemePreference(),
+  showCcSwitch: loadCcSwitchVisibility(),
   mobileSidebarOpen: false,
 };
 
@@ -87,6 +89,7 @@ const elements = {
   settingsView: $("#settings-view"),
   closeSettings: $("#close-settings"),
   themeOptions: document.querySelectorAll("input[name=theme]"),
+  showCcSwitch: $("#show-cc-switch"),
   dialog: $("#new-thread-dialog"),
   newThreadForm: $("#new-thread-form"),
   cwdInput: $("#cwd-input"),
@@ -1051,6 +1054,13 @@ function setTheme(theme) {
   }
 }
 
+function setCcSwitchVisibility(visible) {
+  state.showCcSwitch = Boolean(visible);
+  elements.providerSwitch.classList.toggle("hidden", !state.showCcSwitch);
+  elements.showCcSwitch.checked = state.showCcSwitch;
+  saveCcSwitchVisibility(state.showCcSwitch);
+}
+
 function showSettings() {
   stopRunningRefresh();
   state.activeView = "settings";
@@ -1156,6 +1166,9 @@ elements.closeSettings.addEventListener("click", showConsole);
 for (const input of elements.themeOptions) {
   input.addEventListener("change", () => setTheme(input.value));
 }
+elements.showCcSwitch.addEventListener("change", () => {
+  setCcSwitchVisibility(elements.showCcSwitch.checked);
+});
 $("#close-dialog").addEventListener("click", () => elements.dialog.close());
 $("#cancel-dialog").addEventListener("click", () => elements.dialog.close());
 elements.refreshThreads.addEventListener("click", syncAllThreads);
@@ -1367,6 +1380,7 @@ events.addEventListener("provider-switch", (event) => {
 (async () => {
   try {
     setTheme(state.theme);
+    setCcSwitchVisibility(state.showCcSwitch);
     setMobileSidebar(false);
     await Promise.allSettled([
       refreshHealth(),
