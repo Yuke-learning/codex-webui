@@ -9,7 +9,7 @@ import { CodexGateway, InputError } from "./src/codex-gateway.mjs";
 import { shouldForwardCodexEvent } from "./src/public/refresh-policy.js";
 
 const rootDir = path.dirname(fileURLToPath(import.meta.url));
-const publicDir = path.join(rootDir, "src", "public");
+const publicDir = path.join(rootDir, "dist", "public");
 const host = process.env.HOST ?? "127.0.0.1";
 const port = Number.parseInt(process.env.PORT ?? "8787", 10);
 const gateway = new CodexGateway({ codexBin: process.env.CODEX_BIN ?? "codex" });
@@ -18,9 +18,6 @@ const eventClients = new Set();
 const staticFiles = new Map([
   ["/", { file: "index.html", type: "text/html; charset=utf-8" }],
   ["/app.js", { file: "app.js", type: "text/javascript; charset=utf-8" }],
-  ["/live-activity.js", { file: "live-activity.js", type: "text/javascript; charset=utf-8" }],
-  ["/refresh-policy.js", { file: "refresh-policy.js", type: "text/javascript; charset=utf-8" }],
-  ["/transcript.js", { file: "transcript.js", type: "text/javascript; charset=utf-8" }],
   ["/styles.css", { file: "styles.css", type: "text/css; charset=utf-8" }],
 ]);
 
@@ -32,6 +29,7 @@ gateway.on("transportError", (event) => broadcast("transport-error", event));
 
 const server = createServer(async (request, response) => {
   try {
+    applySecurityHeaders(response);
     const url = new URL(request.url ?? "/", `http://${request.headers.host ?? host}`);
     const pathname = url.pathname;
 
@@ -190,7 +188,7 @@ async function readJson(request) {
 }
 
 async function serveStatic(response, pathname) {
-  const asset = staticFiles.get(pathname);
+  const asset = staticFiles.get(pathname) ?? bundledAsset(pathname);
   if (!asset) {
     respondJson(response, 404, { error: "Not found" });
     return;
@@ -206,6 +204,39 @@ async function serveStatic(response, pathname) {
     "Referrer-Policy": "same-origin",
   });
   createReadStream(filePath).pipe(response);
+}
+
+function bundledAsset(pathname) {
+  const match = /^\/assets\/([A-Za-z0-9._-]+\.(woff2?|ttf))$/.exec(pathname);
+  if (!match) return null;
+  const extension = path.extname(match[1]);
+  const types = {
+    ".woff": "font/woff",
+    ".woff2": "font/woff2",
+    ".ttf": "font/ttf",
+  };
+  return { file: path.join("assets", match[1]), type: types[extension] };
+}
+
+function applySecurityHeaders(response) {
+  response.setHeader("Content-Security-Policy", [
+    "default-src 'self'",
+    "base-uri 'none'",
+    "connect-src 'self'",
+    "font-src 'self'",
+    "form-action 'self'",
+    "frame-ancestors 'none'",
+    "img-src 'self' data:",
+    "object-src 'none'",
+    "script-src 'self'",
+    "style-src-elem 'self'",
+    "style-src-attr 'unsafe-inline'",
+    "worker-src 'none'",
+  ].join("; "));
+  response.setHeader("Permissions-Policy", "camera=(), microphone=(), geolocation=()");
+  response.setHeader("Referrer-Policy", "same-origin");
+  response.setHeader("X-Content-Type-Options", "nosniff");
+  response.setHeader("X-Frame-Options", "DENY");
 }
 
 function respondJson(response, status, payload = undefined) {

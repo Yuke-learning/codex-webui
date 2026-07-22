@@ -8,8 +8,19 @@
     "node": ">=22"
   },
   "scripts": {
-    "dev": "node server.mjs",
-    "start": "node server.mjs",
-    "test": "node --test"
+    "build": "node scripts/build-client.mjs",
+    "dev": "npm run build && node server.mjs",
+    "start": "npm run build && node server.mjs",
+    "test": "npm run build && node --test"
+  },
+  "dependencies": {
+    "dompurify": "^3.4.12",
+    "highlight.js": "^11.11.1",
+    "katex": "^0.18.1",
+    "markdown-it": "^14.3.0"
+  },
+  "devDependencies": {
+    "esbuild": "^0.28.1",
+    "jsdom": "^29.1.1"
   }
 }

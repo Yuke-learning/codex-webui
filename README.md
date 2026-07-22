@@ -8,9 +8,12 @@
 
 ## 第一版运行方式
 
-要求：Node.js 22+、已安装并登录的 Codex CLI。第一版不依赖 `npm install`，也不会读取或复制你的 Codex 凭据。
+要求：Node.js 22+、已安装并登录的 Codex CLI。依赖只用于前端构建和测试，不会读取或复制你的 Codex 凭据。
 
 ```bash
+# 首次运行或依赖更新后安装依赖
+npm install
+
 # 如果已通过 Codex installer 安装 standalone CLI：首次启用本地受控 daemon
 codex app-server daemon bootstrap --remote-control
 
@@ -34,10 +37,11 @@ codex remote-control start --json
 - 左侧按 Git 项目分组对话，未关联项目的线程单独归类；项目节可随时折叠并保留本机浏览器偏好，即使其包含正在预览的对话。项目标题带、层级轨道、选中指示条和“非项目”虚线分组通过主题语义变量适配全部外观。左侧导航与主消息区独立滚动，顶部操作栏固定在消息区之外。
 - 手机窄屏使用抽屉式对话导航：菜单打开项目列表，选择对话、新建对话、打开设置、触摸遮罩或按 Escape 均会关闭抽屉；消息区和输入框始终占用主屏。
 - 对话记录按 app-server 的 `userMessage`、`agentMessage` 和命令执行项转换；内部 `heartbeat` 自动化信封不会混入主消息流，而会保留在默认收起的“自动化事件”审计区。
+- 用户与 Codex 消息支持 CommonMark 风格 Markdown、表格、链接、KaTeX 行内/块级公式和常见语言代码高亮；代码块、表格与公式在手机上可独立横向滚动。渲染前后均经过 DOMPurify 清理，禁用远程图片和可执行 HTML，所有依赖与字体均打包到本地，不加载第三方 CDN。
 - 新建线程、发送消息/追加指令、停止、改名、归档和带确认的删除。
 - 从 app-server 动态读取可用模型与推理强度；详情页显示线程的实际设置，并可将新的模型/强度应用于后续 turn。
 - SSE 事件按影响范围处理：目标和 token 使用量等未展示事件不会触发重绘；仅当前线程完成、压缩或设置变更才刷新详情。
 - 优先 `codex app-server proxy`、自动回退到直接 `codex app-server --stdio` 的 JSON-RPC adapter，支持 JSONL 与 `Content-Length` 帧。
-- loopback 默认监听、同源写请求检查、请求大小限制与安全的 `.gitignore`。
+- loopback 默认监听、同源写请求检查、请求大小限制、内容安全策略（CSP）与安全的 `.gitignore`。
 
 第一版会显示 Codex 的审批请求，但不支持网页端批准；请暂时在桌面 App 审阅，避免远程网页意外批准高风险操作。

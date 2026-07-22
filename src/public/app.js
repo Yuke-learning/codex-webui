@@ -1,6 +1,10 @@
 import { classifyCodexEvent } from "./refresh-policy.js";
 import { describeLiveActivity } from "./live-activity.js";
+import { appendRichContent } from "./rich-content.js";
 import { toTranscript, transcriptSignature } from "./transcript.js";
+
+const RICH_MESSAGE_ROLES = new Set(["user", "assistant"]);
+const MAX_RICH_MESSAGE_LENGTH = 100_000;
 
 const THEME_IDS = new Set([
   "default",
@@ -568,7 +572,20 @@ function messageNode(text, role, label) {
   heading.className = "message-label";
   heading.textContent = label;
   const content = document.createElement("div");
-  content.textContent = text;
+  content.className = "message-content";
+  if (RICH_MESSAGE_ROLES.has(role) && text.length <= MAX_RICH_MESSAGE_LENGTH) {
+    content.classList.add("rich");
+    try {
+      appendRichContent(content, text);
+    } catch (error) {
+      console.warn("Rich message rendering failed; using plain text.", error);
+      content.className = "message-content plain";
+      content.textContent = text;
+    }
+  } else {
+    content.classList.add("plain");
+    content.textContent = text;
+  }
   node.append(heading, content);
   return node;
 }
