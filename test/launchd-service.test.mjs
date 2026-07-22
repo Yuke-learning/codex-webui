@@ -14,6 +14,9 @@ test("creates a loopback-only keepalive LaunchAgent without shell interpolation"
     pathValue: "/stable/node/bin:/usr/bin:/bin",
     codexBinary: "/Users/test/.npm-global/bin/codex",
     tailscaleBinary: "/usr/local/bin/tailscale",
+    ccSwitchBinary: "/Users/test/.local/bin/cc-switch",
+    ccSwitchConfigDir: "/Users/test/.cc-switch",
+    ccSwitchMode: "auto",
   });
 
   assert.match(plist, new RegExp(`<string>${LAUNCHD_LABEL}</string>`));
@@ -23,6 +26,9 @@ test("creates a loopback-only keepalive LaunchAgent without shell interpolation"
   assert.match(plist, /<key>HOST<\/key>\s*<string>127\.0\.0\.1<\/string>/);
   assert.match(plist, /<key>PORT<\/key>\s*<string>8787<\/string>/);
   assert.match(plist, /node &amp; stable/);
+  assert.match(plist, /<key>CC_SWITCH_BIN<\/key>\s*<string>\/Users\/test\/\.local\/bin\/cc-switch<\/string>/);
+  assert.match(plist, /<key>CC_SWITCH_CONFIG_DIR<\/key>\s*<string>\/Users\/test\/\.cc-switch<\/string>/);
+  assert.match(plist, /<key>CC_SWITCH_MODE<\/key>\s*<string>auto<\/string>/);
   assert.doesNotMatch(plist, /\/bin\/(?:ba|z|fi)?sh<\/string>/);
 });
 

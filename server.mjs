@@ -5,7 +5,10 @@ import path from "node:path";
 import process from "node:process";
 import { fileURLToPath } from "node:url";
 
+import { CcSwitchAdapter } from "./src/cc-switch-adapter.mjs";
+import { PortableCcSwitchInstaller } from "./src/cc-switch-portable.mjs";
 import { CodexGateway, InputError } from "./src/codex-gateway.mjs";
+import { ProviderManager } from "./src/provider-manager.mjs";
 import { shouldForwardCodexEvent } from "./src/public/refresh-policy.js";
 import { TailscaleMonitor } from "./src/tailscale-monitor.mjs";
 
@@ -14,6 +17,10 @@ const publicDir = path.join(rootDir, "dist", "public");
 const host = process.env.HOST ?? "127.0.0.1";
 const port = Number.parseInt(process.env.PORT ?? "8787", 10);
 const gateway = new CodexGateway({ codexBin: process.env.CODEX_BIN ?? "codex" });
+const ccSwitchRuntimeRoot = path.join(rootDir, ".runtime", "cc-switch");
+const ccSwitch = new CcSwitchAdapter({ runtimeRoot: ccSwitchRuntimeRoot });
+const ccSwitchInstaller = new PortableCcSwitchInstaller({ runtimeRoot: ccSwitchRuntimeRoot });
+const providerManager = new ProviderManager({ adapter: ccSwitch, gateway, allowConfigSwitch: true });
 const tailscaleMonitor = new TailscaleMonitor({
   target: `http://127.0.0.1:${port}`,
   tailscaleBin: process.env.TAILSCALE_BIN ?? "tailscale",
@@ -33,6 +40,7 @@ gateway.on("notification", (event) => {
 });
 gateway.on("serverRequest", (event) => broadcast("approval", event));
 gateway.on("transportError", (event) => broadcast("transport-error", event));
+providerManager.on("event", (event) => broadcast("provider-switch", event));
 tailscaleMonitor.on("change", (status) => {
   broadcast("network-status", status);
   if (status.serveReady) console.log(`Tailnet access ready: ${status.url}`);
@@ -88,6 +96,25 @@ async function handleApi(request, response, url) {
     return;
   }
 
+  if (request.method === "GET" && (pathname === "/api/providers" || pathname === "/api/providers/status")) {
+    const status = await providerManager.status();
+    status.portable = ccSwitchInstaller.status();
+    respondJson(response, 200, pathname.endsWith("/status") ? status : {
+      data: status.providers,
+      currentProviderId: status.currentProviderId,
+      available: status.available,
+      compatible: status.compatible,
+      version: status.version,
+      mode: status.mode,
+      requiresRestart: status.requiresRestart,
+      switching: status.switching,
+      pendingProviderId: status.pendingProviderId,
+      portable: status.portable,
+      error: status.error,
+    });
+    return;
+  }
+
   if (request.method === "GET" && pathname === "/api/events") {
     response.writeHead(200, {
       "Content-Type": "text/event-stream; charset=utf-8",
@@ -102,6 +129,25 @@ async function handleApi(request, response, url) {
   }
 
   enforceSameOrigin(request);
+
+  if (request.method === "POST" && pathname === "/api/providers/portable/install") {
+    const installed = await ccSwitchInstaller.install();
+    await ccSwitch.resolveBinary({ refresh: true });
+    const status = await providerManager.status();
+    status.portable = ccSwitchInstaller.status();
+    broadcast("provider-switch", { phase: "portable-installed", at: new Date().toISOString(), installed, status });
+    respondJson(response, 201, { installed, status });
+    return;
+  }
+
+  const providerMatch = /^\/api\/providers\/([^/]+)\/activate$/.exec(pathname);
+  if (request.method === "POST" && providerMatch) {
+    const body = await readJson(request);
+    const providerId = decodeURIComponent(providerMatch[1]);
+    const result = await providerManager.activate(providerId, { idempotencyKey: body.idempotencyKey });
+    respondJson(response, result.state === "queued" ? 202 : 200, result);
+    return;
+  }
 
   if (request.method === "GET" && pathname === "/api/threads") {
     const threads = await gateway.listThreads({
@@ -268,9 +314,9 @@ function respondJson(response, status, payload = undefined) {
 }
 
 function respondError(response, error) {
-  const status = error instanceof InputError ? error.status : 502;
+  const status = error instanceof InputError || Number.isInteger(error?.status) ? error.status : 502;
   const message = error instanceof Error ? error.message : "Unexpected server error";
-  console.error(error);
+  console.error(`[request-error] ${error?.name ?? "Error"} ${error?.code ?? "UNEXPECTED"}: ${message}`);
   respondJson(response, status, { error: message });
 }
 

@@ -114,16 +114,42 @@ button { cursor: pointer; }
 .status-dot { width: 6px; height: 6px; border-radius: 50%; background: var(--dim); }
 .status-dot.running { background: var(--accent); box-shadow: 0 0 0 3px #263c20; }
 
-.workspace { display: grid; grid-template-rows: auto minmax(0, 1fr) auto; min-width: 0; min-height: 0; overflow: hidden; background: radial-gradient(circle at 85% 8%, #1c2229 0, var(--bg) 32%); }
+.workspace { display: grid; grid-template-rows: auto auto minmax(0, 1fr) auto; min-width: 0; min-height: 0; overflow: hidden; background: radial-gradient(circle at 85% 8%, #1c2229 0, var(--bg) 32%); }
+.global-toolbar { display: flex; align-items: stretch; justify-content: flex-end; min-height: 48px; padding: 6px 18px; border-bottom: 1px solid var(--line); background: color-mix(in srgb, var(--panel) 88%, transparent); }
 .thread-header { display: flex; align-items: center; justify-content: space-between; gap: 18px; min-height: 80px; padding: 14px 30px; border-bottom: 1px solid var(--line); }
 .thread-header h1 { margin: 3px 0 0; max-width: 600px; overflow: hidden; font-size: 18px; text-overflow: ellipsis; white-space: nowrap; }
 .header-controls { display: flex; flex-wrap: wrap; align-items: center; justify-content: flex-end; gap: 10px; }
 .thread-settings { display: flex; align-items: stretch; overflow: hidden; border: 1px solid var(--line); border-radius: 10px; background: #16191e; }
+.provider-control { display: grid; min-width: 132px; gap: 1px; padding: 5px 10px 6px; border: 0; border-right: 1px solid var(--line); border-radius: 0; background: transparent; color: var(--text); text-align: left; }
+.provider-control span { color: var(--dim); font-size: 10px; font-weight: 700; letter-spacing: .05em; text-transform: uppercase; }
+.provider-control strong { max-width: 160px; overflow: hidden; font-size: 12px; text-overflow: ellipsis; white-space: nowrap; }
+.provider-control:disabled { cursor: default; opacity: 1; }
+.provider-control:not(:disabled) { cursor: pointer; }
+.provider-control:not(:disabled):hover { background: var(--panel-strong); }
+.provider-control.is-unavailable strong { color: var(--dim); font-weight: 600; }
+.global-provider-control { min-width: 168px; border: 1px solid var(--line); border-radius: 8px; background: var(--assistant); }
 .select-control { display: grid; min-width: 124px; gap: 1px; padding: 5px 9px 6px; border-right: 1px solid var(--line); }
 .select-control:last-child { border-right: 0; }
 .select-control span { color: var(--dim); font-size: 10px; font-weight: 700; letter-spacing: .05em; text-transform: uppercase; }
 .select-control select { max-width: 175px; padding: 0; border: 0; outline: 0; background: transparent; color: var(--text); font-size: 12px; font-weight: 650; }
 .select-control select:disabled { color: var(--dim); }
+.provider-dialog { width: min(520px, calc(100vw - 32px)); max-height: min(680px, calc(100dvh - 40px)); overflow: auto; padding: 22px; border: 1px solid var(--line); border-radius: 14px; background: var(--panel); color: var(--text); box-shadow: 0 24px 80px #000a; }
+.provider-dialog::backdrop { background: #000a; backdrop-filter: blur(3px); }
+.provider-dialog .dialog-heading { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; }
+.provider-dialog .dialog-heading .icon-button { flex: 0 0 auto; width: 44px; height: 44px; }
+.provider-dialog h2 { margin: 4px 0 0; }
+.provider-list { display: grid; gap: 8px; margin-top: 18px; }
+.provider-empty { margin: 0; padding: 16px; border: 1px dashed var(--line); border-radius: 9px; color: var(--dim); text-align: center; }
+.provider-portable { display: flex; align-items: center; justify-content: space-between; gap: 14px; margin-top: 16px; padding: 12px; border: 1px dashed var(--line); border-radius: 9px; background: var(--assistant); }
+.provider-portable > div { display: grid; min-width: 0; gap: 4px; }
+.provider-portable span { color: var(--dim); font-size: 12px; line-height: 1.45; }
+.provider-portable button { flex: 0 0 auto; min-height: 44px; }
+.provider-row { display: flex; align-items: center; justify-content: space-between; gap: 14px; min-height: 64px; padding: 10px 12px; border: 1px solid var(--line); border-radius: 9px; background: var(--assistant); }
+.provider-row.is-active { border-color: var(--accent); }
+.provider-row > div { display: grid; min-width: 0; gap: 3px; }
+.provider-row strong { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.provider-row span { color: var(--dim); font-size: 12px; }
+.provider-row button { flex: 0 0 auto; }
 .thread-actions { display: flex; gap: 7px; }
 .eyebrow { margin: 0; color: var(--dim); font-size: 12px; letter-spacing: .04em; }
 .empty-state { align-self: center; justify-self: center; max-width: 520px; padding: 28px; text-align: center; }
@@ -771,18 +797,27 @@ html[data-theme="accessible-ethical"] :focus-visible { outline: 3px solid #ffe60
 
 @media (max-width: 760px) {
   .app-shell { position: relative; display: block; min-height: 100dvh; }
-  .workspace { min-height: 100dvh; height: 100dvh; grid-template-rows: auto minmax(0, 1fr) auto; }
+  .workspace { min-height: 100dvh; height: 100dvh; grid-template-rows: auto auto minmax(0, 1fr) auto; }
   .sidebar { position: fixed; z-index: 30; top: 0; bottom: 0; left: 0; width: min(360px, calc(100vw - 48px)); min-height: 100dvh; padding: 16px 12px calc(16px + env(safe-area-inset-bottom)); border-right: 1px solid var(--line); border-bottom: 0; box-shadow: 20px 0 48px #0008; transform: translateX(-105%); visibility: hidden; pointer-events: none; transition: transform .2s ease, visibility .2s ease; }
   body.mobile-sidebar-open .sidebar { transform: translateX(0); visibility: visible; pointer-events: auto; }
   .mobile-sidebar-backdrop { position: fixed; z-index: 20; inset: 0; border: 0; background: #0009; }
-  .mobile-sidebar-toggle { position: fixed; z-index: 10; top: calc(12px + env(safe-area-inset-top)); left: 12px; display: grid; place-items: center; width: 36px; height: 36px; border: 1px solid var(--line); border-radius: 7px; background: var(--panel); color: var(--text); font-size: 18px; line-height: 1; box-shadow: 0 8px 22px #0005; }
+  .global-toolbar { align-items: stretch; justify-content: space-between; min-height: calc(52px + env(safe-area-inset-top)); padding: calc(7px + env(safe-area-inset-top)) 10px 7px; }
+  .mobile-sidebar-toggle { position: static; z-index: 10; display: grid; place-items: center; width: 44px; height: 44px; border: 1px solid var(--line); border-radius: 7px; background: var(--panel); color: var(--text); font-size: 18px; line-height: 1; box-shadow: 0 8px 22px #0005; }
   body.mobile-sidebar-open .mobile-sidebar-toggle { opacity: 0; pointer-events: none; }
   .mobile-sidebar-close { display: grid; place-items: center; flex: 0 0 auto; font-size: 22px; }
-  .thread-header { align-items: flex-start; gap: 12px; min-height: 0; padding: calc(12px + env(safe-area-inset-top)) 16px 12px 58px; }
+  .global-provider-control { flex: 0 1 210px; min-width: 0; min-height: 44px; }
+  .global-provider-control strong { max-width: 150px; }
+  .thread-header { align-items: flex-start; gap: 12px; min-height: 0; padding: 12px 16px; }
   .thread-header > div:first-child { width: 100%; min-width: 0; }
   .thread-header h1 { font-size: 16px; }
   .header-controls { width: 100%; justify-content: flex-start; gap: 8px; }
   .thread-settings { order: 2; width: 100%; }
+  .provider-dialog { position: fixed; inset: auto 0 0; width: 100%; max-width: none; max-height: min(82dvh, 720px); margin: 0; padding: 18px 14px calc(16px + env(safe-area-inset-bottom)); border-right: 0; border-bottom: 0; border-left: 0; border-radius: 16px 16px 0 0; }
+  .provider-dialog .dialog-heading { position: sticky; z-index: 1; top: -18px; margin: -18px -14px 0; padding: 18px 14px 12px; background: var(--panel); }
+  .provider-portable { align-items: stretch; flex-direction: column; }
+  .provider-portable button { width: 100%; }
+  .provider-row { min-height: 68px; }
+  .provider-row button { min-width: 72px; min-height: 44px; }
   .thread-actions { width: 100%; flex-wrap: nowrap; }
   .thread-actions button { flex: 1; min-width: 0; padding: 0 8px; }
   .select-control { flex: 1; min-width: 0; }

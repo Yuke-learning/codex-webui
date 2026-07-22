@@ -20,6 +20,9 @@ const THEME_IDS = new Set([
 const state = {
   threads: [],
   models: [],
+  providers: [],
+  providerStatus: null,
+  providerSwitchInFlight: false,
   threadSettings: new Map(),
   collapsedProjectKeys: loadCollapsedProjectKeys(),
   expandedActivityGroupKeys: loadExpandedActivityGroupKeys(),
@@ -57,6 +60,15 @@ const elements = {
   cwd: $("#thread-cwd"),
   threadModel: $("#thread-model"),
   threadEffort: $("#thread-effort"),
+  providerSwitch: $("#provider-switch"),
+  providerSwitchLabel: $("#provider-switch-label"),
+  providerDialog: $("#provider-dialog"),
+  providerDialogNote: $("#provider-dialog-note"),
+  providerList: $("#provider-list"),
+  closeProviderDialog: $("#close-provider-dialog"),
+  providerPortable: $("#provider-portable"),
+  providerPortableDetail: $("#provider-portable-detail"),
+  installProviderPortable: $("#install-provider-portable"),
   empty: $("#empty-state"),
   view: $("#thread-view"),
   messages: $("#messages"),
@@ -138,6 +150,136 @@ async function loadModels() {
   state.models = payload.data ?? [];
   renderNewThreadSettings();
   if (state.selectedThread) renderThreadSettings(state.selectedThread);
+}
+
+async function loadProviders() {
+  const payload = await api("/api/providers");
+  state.providers = payload.data ?? [];
+  state.providerStatus = payload;
+  renderProviderStatus();
+}
+
+function renderProviderStatus() {
+  const status = state.providerStatus;
+  const current = state.providers.find((provider) => provider.id === status?.currentProviderId)
+    ?? state.providers.find((provider) => provider.active);
+  elements.providerSwitch.disabled = !status?.available
+    || !status?.compatible
+    || state.providers.length === 0
+    || state.providerSwitchInFlight
+    || status.switching;
+  elements.providerSwitch.classList.toggle("is-unavailable", !status?.available || !status?.compatible);
+  const pending = state.providers.find((provider) => provider.id === status?.pendingProviderId);
+  elements.providerSwitchLabel.textContent = pending && current
+    ? `${current.name} → ${pending.name}`
+    : current?.name ?? (status?.available ? "状态不可用" : "未检测到 CC Switch");
+  elements.providerSwitch.title = current
+    ? `当前全局服务商：${current.name}。${status.mode === "proxy" ? "代理模式可在下一轮热切换。" : "配置模式需要重连 Codex。"}`
+    : status?.error ?? "未检测到 CC Switch CLI。";
+  renderProviderDialog();
+}
+
+function renderProviderDialog() {
+  if (!elements.providerList) return;
+  elements.providerList.replaceChildren();
+  const status = state.providerStatus ?? {};
+  elements.providerDialogNote.textContent = status.mode === "proxy"
+    ? "代理接管模式：当前执行不会中断，切换从下一轮请求开始生效。"
+    : "配置切换模式：当前执行不会中断，空闲后切换并自动重连 Codex。";
+  const portable = status.portable ?? {};
+  const needsPortable = !status.available || !status.compatible;
+  elements.providerPortable.classList.toggle("hidden", !needsPortable || !portable.supported);
+  elements.providerPortableDetail.textContent = portable.supported
+    ? `固定版本 ${portable.version}，约 ${formatBytes(portable.downloadSize)}；下载后会校验 SHA-256。`
+    : "当前系统暂无可用的便携组件。";
+  elements.installProviderPortable.disabled = state.providerSwitchInFlight || portable.installing;
+  elements.installProviderPortable.textContent = portable.installing ? "正在安装…" : "安装便携组件";
+
+  for (const provider of state.providers) {
+    const row = document.createElement("div");
+    row.className = `provider-row${provider.active ? " is-active" : ""}`;
+    row.setAttribute("role", "listitem");
+    const copy = document.createElement("div");
+    const name = document.createElement("strong");
+    name.textContent = provider.name;
+    const meta = document.createElement("span");
+    meta.textContent = provider.active ? "当前服务商" : "用于后续所有 Codex 请求";
+    copy.append(name, meta);
+    const button = document.createElement("button");
+    button.type = "button";
+    button.className = provider.active ? "quiet-button" : "primary-button";
+    button.textContent = provider.active ? "已启用" : "切换";
+    button.disabled = provider.active || state.providerSwitchInFlight;
+    button.addEventListener("click", () => activateProvider(provider.id));
+    row.append(copy, button);
+    elements.providerList.append(row);
+  }
+  if (!state.providers.length && status.available) {
+    const empty = document.createElement("p");
+    empty.className = "provider-empty";
+    empty.textContent = status.error ?? "CC Switch 中还没有可用的 Codex 服务商。";
+    elements.providerList.append(empty);
+  }
+}
+
+async function installPortableProvider() {
+  const portable = state.providerStatus?.portable;
+  if (!portable?.supported || state.providerSwitchInFlight) return;
+  if (!window.confirm(`从固定 GitHub Release 下载并安装 CC Switch CLI ${portable.version}？下载内容会经过 SHA-256 校验。`)) return;
+  state.providerSwitchInFlight = true;
+  renderProviderStatus();
+  try {
+    const result = await api("/api/providers/portable/install", { method: "POST", body: "{}" });
+    state.providerStatus = result.status;
+    state.providers = result.status.providers ?? [];
+    renderProviderStatus();
+    showToast(`CC Switch 便携组件 ${result.installed.version} 已安装。`, "info", 6000);
+  } catch (error) {
+    showToast(error.message, "error", 9000);
+  } finally {
+    state.providerSwitchInFlight = false;
+    renderProviderStatus();
+  }
+}
+
+function formatBytes(value) {
+  if (!Number.isFinite(value) || value <= 0) return "未知大小";
+  return `${(value / (1024 * 1024)).toFixed(1)} MB`;
+}
+
+async function activateProvider(providerId) {
+  if (state.providerSwitchInFlight) return;
+  state.providerSwitchInFlight = true;
+  renderProviderStatus();
+  try {
+    const result = await api(`/api/providers/${encodeURIComponent(providerId)}/activate`, {
+      method: "POST",
+      body: JSON.stringify({ idempotencyKey: crypto.randomUUID() }),
+    });
+    if (result.state === "queued") {
+      await loadProviders();
+    } else {
+      if (Array.isArray(result.models)) applyProviderModels(result.models);
+      await loadProviders();
+    }
+    elements.providerDialog.close();
+  } catch (error) {
+    showToast(error.message, "error", 8000);
+  } finally {
+    state.providerSwitchInFlight = false;
+    renderProviderStatus();
+  }
+}
+
+function applyProviderModels(models) {
+  const currentModel = state.selectedThread?.settings?.model;
+  const supported = !currentModel || models.some((model) => model.model === currentModel || model.id === currentModel);
+  state.models = models;
+  renderNewThreadSettings();
+  if (state.selectedThread) renderThreadSettings(state.selectedThread);
+  if (!supported) {
+    showToast(`当前任务使用的模型 ${currentModel} 不在新服务商模型列表中，请在发送下一条消息前重新选择。`, "error", 9000);
+  }
 }
 
 async function loadThreads({ syncAll = false } = {}) {
@@ -1098,6 +1240,16 @@ elements.interrupt.addEventListener("click", async () => {
   }
 });
 
+elements.providerSwitch.addEventListener("click", () => {
+  renderProviderDialog();
+  elements.providerDialog.showModal();
+});
+elements.closeProviderDialog.addEventListener("click", () => elements.providerDialog.close());
+elements.installProviderPortable.addEventListener("click", installPortableProvider);
+elements.providerDialog.addEventListener("click", (event) => {
+  if (event.target === elements.providerDialog) elements.providerDialog.close();
+});
+
 $("#rename-thread").addEventListener("click", async () => {
   if (!state.selectedThread) return;
   const name = window.prompt("新的对话名称", state.selectedThread.name || state.selectedThread.preview || "");
@@ -1177,12 +1329,52 @@ events.addEventListener("network-status", (event) => {
     console.warn("Ignored malformed network status event.", error);
   }
 });
+events.addEventListener("provider-switch", (event) => {
+  try {
+    const update = JSON.parse(event.data);
+    if (update.phase === "started") showToast("正在切换全局服务商…", "info");
+    if (update.phase === "started") {
+      state.providerSwitchInFlight = true;
+      renderProviderStatus();
+    }
+    if (update.phase === "queued") {
+      showToast("服务商切换已排队，将在当前轮次结束后执行。", "info", 6000);
+      loadProviders().catch(() => undefined);
+    }
+    if (update.phase === "completed") {
+      state.providerSwitchInFlight = false;
+      if (Array.isArray(update.models)) applyProviderModels(update.models);
+      showToast(update.gatewayRestarted ? "全局服务商切换完成，Codex 已重连。" : "全局服务商切换完成，下一轮请求开始生效。", "info");
+      for (const warning of update.warnings ?? []) showToast(warning, "error", 8000);
+      loadProviders().catch(() => undefined);
+    }
+    if (update.phase === "failed") {
+      state.providerSwitchInFlight = false;
+      renderProviderStatus();
+      showToast(update.error ?? "服务商切换失败。", "error", 8000);
+      loadProviders().catch(() => undefined);
+    }
+    if (update.phase === "portable-installed") {
+      state.providerStatus = update.status;
+      state.providers = update.status?.providers ?? [];
+      renderProviderStatus();
+    }
+  } catch (error) {
+    console.warn("Ignored malformed provider switch event.", error);
+  }
+});
 
 (async () => {
   try {
     setTheme(state.theme);
     setMobileSidebar(false);
-    await refreshHealth();
+    await Promise.allSettled([
+      refreshHealth(),
+      loadProviders().catch((error) => {
+        state.providerStatus = { available: false, compatible: false, error: error.message };
+        renderProviderStatus();
+      }),
+    ]);
     if (state.health?.ok) {
       await Promise.all([loadModels(), loadThreads()]);
     }

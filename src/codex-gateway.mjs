@@ -28,8 +28,10 @@ export class CodexGateway extends EventEmitter {
   #client = null;
   #connecting = null;
   #activeTurns = new Map();
+  #runningThreads = new Set();
   #queue = new KeyedQueue();
   #transport = null;
+  #connectionGeneration = 0;
 
   constructor({ codexBin = "codex" } = {}) {
     super();
@@ -63,6 +65,11 @@ export class CodexGateway extends EventEmitter {
       ...params,
       ...(cursor ? { cursor } : {}),
     }));
+    for (const thread of threads) {
+      if (!thread?.id) continue;
+      if (isThreadRunning(thread.status)) this.#runningThreads.add(thread.id);
+      else if (!this.#activeTurns.has(thread.id)) this.#runningThreads.delete(thread.id);
+    }
     return threads.map(toThreadSummary);
   }
 
@@ -82,6 +89,8 @@ export class CodexGateway extends EventEmitter {
         effort: resume.reasoningEffort,
       },
     };
+    if (isThreadRunning(thread.status)) this.#runningThreads.add(threadId);
+    else this.#runningThreads.delete(threadId);
     if (this.#activeTurns.has(threadId) && !isThreadRunning(thread.status)) thread.status = "running";
     return thread;
   }
@@ -142,6 +151,7 @@ export class CodexGateway extends EventEmitter {
       const result = await this.#request("turn/start", { threadId, input });
       const turnId = result.turn?.id;
       if (turnId) this.#activeTurns.set(threadId, turnId);
+      this.#runningThreads.add(threadId);
       return { mode: "start", turn: result.turn };
     });
   }
@@ -152,6 +162,8 @@ export class CodexGateway extends EventEmitter {
     if (!turnId) throw new InputError("This WebUI session has no active turn for the thread. Refresh the thread before stopping it.", 409);
     const result = await this.#request("turn/interrupt", { threadId, turnId });
     this.#activeTurns.delete(threadId);
+    this.#runningThreads.delete(threadId);
+    this.#emitIdleIfNeeded();
     return result;
   }
 
@@ -159,17 +171,42 @@ export class CodexGateway extends EventEmitter {
     assertThreadId(threadId);
     await this.#request("thread/archive", { threadId });
     this.#activeTurns.delete(threadId);
+    this.#runningThreads.delete(threadId);
+    this.#emitIdleIfNeeded();
   }
 
   async deleteThread(threadId) {
     assertThreadId(threadId);
     await this.#request("thread/delete", { threadId });
     this.#activeTurns.delete(threadId);
+    this.#runningThreads.delete(threadId);
+    this.#emitIdleIfNeeded();
+  }
+
+  hasActiveTurns() {
+    return this.#activeTurns.size > 0 || this.#runningThreads.size > 0;
+  }
+
+  async reconnect() {
+    if (this.hasActiveTurns()) {
+      throw new InputError("Codex 正在执行任务，不能重连服务商配置。", 409);
+    }
+    this.close();
+    const health = await this.health();
+    if (!health.ok) {
+      throw new CodexRpcError(health.error ?? "Codex app-server reconnect failed.");
+    }
+    const models = await this.listModels();
+    const result = { health, models };
+    this.emit("reconnected", result);
+    return result;
   }
 
   close() {
+    this.#connectionGeneration += 1;
     this.#client?.close();
     this.#client = null;
+    this.#connecting = null;
     this.#transport = null;
   }
 
@@ -187,7 +224,8 @@ export class CodexGateway extends EventEmitter {
     if (this.#client) return this.#client;
     if (this.#connecting) return this.#connecting;
 
-    this.#connecting = (async () => {
+    const generation = this.#connectionGeneration;
+    const connecting = (async () => {
       const createClient = (args) => {
         const client = new CodexRpcClient({ codexBin: this.codexBin, args });
         client.on("notification", (event) => this.#handleNotification(event));
@@ -207,11 +245,16 @@ export class CodexGateway extends EventEmitter {
       const proxyClient = createClient(["app-server", "proxy"]);
       try {
         await proxyClient.connect();
+        if (generation !== this.#connectionGeneration) {
+          proxyClient.close();
+          throw new CodexRpcError("Codex connection was reset while connecting.");
+        }
         this.#client = proxyClient;
         this.#transport = "managed-daemon proxy";
         return proxyClient;
       } catch (proxyError) {
         proxyClient.close();
+        if (generation !== this.#connectionGeneration) throw proxyError;
         this.emit("transportError", {
           message: `Managed daemon is unavailable; using a direct local app-server instead. (${proxyError.message})`,
         });
@@ -219,15 +262,20 @@ export class CodexGateway extends EventEmitter {
 
       const client = createClient(["app-server", "--stdio"]);
       await client.connect();
+      if (generation !== this.#connectionGeneration) {
+        client.close();
+        throw new CodexRpcError("Codex connection was reset while connecting.");
+      }
       this.#client = client;
       this.#transport = "direct local app-server";
       return client;
     })();
+    this.#connecting = connecting;
 
     try {
-      return await this.#connecting;
+      return await connecting;
     } finally {
-      this.#connecting = null;
+      if (this.#connecting === connecting) this.#connecting = null;
     }
   }
 
@@ -238,14 +286,26 @@ export class CodexGateway extends EventEmitter {
 
     if (event.method === "turn/started" && threadId && turnId) {
       this.#activeTurns.set(threadId, turnId);
+      this.#runningThreads.add(threadId);
     }
     if (event.method === "turn/completed" && threadId) {
       this.#activeTurns.delete(threadId);
+      this.#runningThreads.delete(threadId);
+      this.#emitIdleIfNeeded();
     }
-    if (event.method === "thread/status/changed" && threadId && !isThreadRunning(params.status ?? params.thread?.status)) {
-      this.#activeTurns.delete(threadId);
+    if (event.method === "thread/status/changed" && threadId) {
+      if (isThreadRunning(params.status ?? params.thread?.status)) this.#runningThreads.add(threadId);
+      else {
+        this.#activeTurns.delete(threadId);
+        this.#runningThreads.delete(threadId);
+        this.#emitIdleIfNeeded();
+      }
     }
     this.emit("notification", event);
+  }
+
+  #emitIdleIfNeeded() {
+    if (!this.hasActiveTurns()) this.emit("idle");
   }
 }
 

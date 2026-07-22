@@ -22,6 +22,7 @@ secrets/
 # Local runtime state and logs
 data/
 logs/
+.runtime/
 *.log
 *.sqlite
 *.sqlite-*

@@ -36,7 +36,13 @@
       </aside>
 
       <section class="workspace">
-        <button id="open-mobile-sidebar" class="icon-button mobile-sidebar-toggle" type="button" title="打开对话列表" aria-label="打开对话列表" aria-controls="sidebar" aria-expanded="false">☰</button>
+        <div class="global-toolbar">
+          <button id="open-mobile-sidebar" class="icon-button mobile-sidebar-toggle" type="button" title="打开对话列表" aria-label="打开对话列表" aria-controls="sidebar" aria-expanded="false">☰</button>
+          <button id="provider-switch" class="provider-control global-provider-control" type="button" disabled aria-label="切换全局服务商" title="正在检测 CC Switch">
+            <span>全局服务商</span>
+            <strong id="provider-switch-label">检测中…</strong>
+          </button>
+        </div>
         <header id="thread-header" class="thread-header hidden">
           <div>
             <p id="thread-cwd" class="eyebrow"></p>
@@ -191,6 +197,25 @@
           <button class="primary-button" type="submit">创建线程</button>
         </div>
       </form>
+    </dialog>
+
+    <dialog id="provider-dialog" class="provider-dialog">
+      <div class="dialog-heading">
+        <div>
+          <p class="eyebrow">CC Switch</p>
+          <h2>切换全局服务商</h2>
+        </div>
+        <button id="close-provider-dialog" class="icon-button" type="button" aria-label="关闭">×</button>
+      </div>
+      <p id="provider-dialog-note" class="dialog-note">切换会影响这台 Mac 上后续的所有 Codex 请求。</p>
+      <div id="provider-portable" class="provider-portable hidden">
+        <div>
+          <strong>未检测到兼容的切换组件</strong>
+          <span id="provider-portable-detail"></span>
+        </div>
+        <button id="install-provider-portable" class="quiet-button" type="button">安装便携组件</button>
+      </div>
+      <div id="provider-list" class="provider-list" role="list"></div>
     </dialog>
 
     <div id="toast-region" class="toast-region" aria-live="polite"></div>

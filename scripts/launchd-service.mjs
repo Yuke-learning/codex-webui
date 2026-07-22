@@ -33,10 +33,17 @@ async function install() {
   const tailscaleBinary = process.env.TAILSCALE_BIN
     ? await resolveExecutable(process.env.TAILSCALE_BIN)
     : await resolveOptionalExecutable("tailscale");
+  const ccSwitchBinary = process.env.CC_SWITCH_BIN
+    ? await resolveExecutable(process.env.CC_SWITCH_BIN)
+    : null;
+  const ccSwitchConfigDir = process.env.CC_SWITCH_CONFIG_DIR
+    ? await realpath(process.env.CC_SWITCH_CONFIG_DIR)
+    : null;
   const pathValue = uniquePaths([
     path.dirname(nodeBinary),
     path.dirname(codexBinary),
     tailscaleBinary ? path.dirname(tailscaleBinary) : null,
+    ccSwitchBinary ? path.dirname(ccSwitchBinary) : null,
     "/usr/local/bin",
     "/opt/homebrew/bin",
     "/usr/bin",
@@ -58,6 +65,9 @@ async function install() {
     pathValue,
     codexBinary,
     tailscaleBinary,
+    ccSwitchBinary,
+    ccSwitchConfigDir,
+    ccSwitchMode: process.env.CC_SWITCH_MODE,
     port: Number.parseInt(process.env.PORT ?? "8787", 10),
   });
 

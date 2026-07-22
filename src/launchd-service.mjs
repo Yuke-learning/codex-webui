@@ -14,6 +14,9 @@ export function createLaunchAgentPlist({
   pathValue,
   codexBinary,
   tailscaleBinary,
+  ccSwitchBinary,
+  ccSwitchConfigDir,
+  ccSwitchMode,
   port = 8787,
 }) {
   const absolutePaths = {
@@ -25,6 +28,8 @@ export function createLaunchAgentPlist({
     homeDirectory,
     codexBinary,
     ...(tailscaleBinary ? { tailscaleBinary } : {}),
+    ...(ccSwitchBinary ? { ccSwitchBinary } : {}),
+    ...(ccSwitchConfigDir ? { ccSwitchConfigDir } : {}),
   };
   for (const [name, value] of Object.entries(absolutePaths)) {
     if (!path.isAbsolute(value ?? "")) throw new TypeError(`${name} must be an absolute path.`);
@@ -40,6 +45,9 @@ export function createLaunchAgentPlist({
     PORT: String(port),
     CODEX_BIN: codexBinary,
     ...(tailscaleBinary ? { TAILSCALE_BIN: tailscaleBinary } : {}),
+    ...(ccSwitchBinary ? { CC_SWITCH_BIN: ccSwitchBinary } : {}),
+    ...(ccSwitchConfigDir ? { CC_SWITCH_CONFIG_DIR: ccSwitchConfigDir } : {}),
+    ...(ccSwitchMode ? { CC_SWITCH_MODE: ccSwitchMode } : {}),
   };
 
   return `<?xml version="1.0" encoding="UTF-8"?>

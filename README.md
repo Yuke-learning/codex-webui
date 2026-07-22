@@ -4,7 +4,7 @@
 
 本项目不会使用 ChatGPT App 的账户或云端任务管理能力；所有 Codex 请求继续由 Mac 上现有的 API / Responses 配置发起，网页只作为安全的远程控制台。
 
-设计方案见 [docs/remote-codex-console.md](docs/remote-codex-console.md)，从公开仓库全新部署见 [docs/installation.md](docs/installation.md)。
+设计方案见 [docs/remote-codex-console.md](docs/remote-codex-console.md)，从公开仓库全新部署见 [docs/installation.md](docs/installation.md)，CC Switch 集成边界与运维方式见 [docs/cc-switch-provider-switching.md](docs/cc-switch-provider-switching.md)。
 
 ## 第一版运行方式
 
@@ -71,6 +71,15 @@ TAILSCALE_AUTO_SERVE=false npm run dev
 
 # tailscale 不在 PATH 时指定二进制
 TAILSCALE_BIN=/usr/local/bin/tailscale npm run dev
+
+# 可选：指定已安装的 cc-switch-cli；必须使用绝对路径
+CC_SWITCH_BIN=/absolute/path/to/cc-switch npm run dev
+
+# auto 自动识别代理接管；也可以明确指定 proxy 或 config
+CC_SWITCH_MODE=auto npm run dev
+
+# 使用非默认 CC Switch 配置根目录
+CC_SWITCH_CONFIG_DIR=/absolute/path/to/cc-switch-config npm run dev
 ```
 
 ## 已实现
@@ -84,6 +93,8 @@ TAILSCALE_BIN=/usr/local/bin/tailscale npm run dev
 - 用户与 Codex 消息支持 CommonMark 风格 Markdown、表格、链接、KaTeX 行内/块级公式和常见语言代码高亮；代码块、表格与公式在手机上可独立横向滚动。渲染前后均经过 DOMPurify 清理，禁用远程图片和可执行 HTML，所有依赖与字体均打包到本地，不加载第三方 CDN。
 - 新建线程、发送消息/追加指令、停止、改名、归档和带确认的删除。
 - 从 app-server 动态读取可用模型与推理强度；详情页显示线程的实际设置，并可将新的模型/强度应用于后续 turn。
+- 顶部始终显示 CC Switch 全局服务商入口：服务端只返回服务商 ID、名称和启用状态，不向浏览器传递 API Key 或完整 API URL。代理接管模式在下一轮热切换；普通配置模式等待当前任务结束后切换、重连 Codex 并刷新模型列表，验证失败会自动切回原服务商。
+- 未检测到兼容 CLI 时，可从页面安装固定版本的便携组件。下载地址、版本、大小和 SHA-256 均写死在发布清单中，压缩包路径经过校验，二进制安装到被 Git 忽略的 `.runtime/`，不会提交服务商配置或密钥。
 - SSE 事件按影响范围处理：目标和 token 使用量等未展示事件不会触发重绘；仅当前线程完成、压缩或设置变更才刷新详情。
 - Tailscale 连接与 Serve 入口持续监控；状态变化通过 SSE 实时同步到页面，健康接口只返回本机连接和当前 WebUI 入口，不暴露 tailnet 中的其他设备列表。
 - 提供 macOS 用户级 `launchd` 常驻部署：登录启动、异常自动恢复、直接使用稳定 Node 入口，并避免依赖 Codex 临时终端生命周期。
