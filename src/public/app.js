@@ -123,8 +123,13 @@ function renderThreadList() {
     section.className = `project-group${collapsed ? " is-collapsed" : ""}${isUngrouped ? " is-ungrouped" : ""}`;
     section.setAttribute("aria-label", `${group.name}，${group.threads.length} 个对话`);
 
-    const heading = document.createElement("div");
+    const heading = document.createElement("button");
     heading.className = "project-heading";
+    heading.type = "button";
+    heading.setAttribute("aria-expanded", String(!collapsed));
+    heading.setAttribute("aria-controls", rowsId);
+    heading.title = `${collapsed ? "展开" : "收起"} ${group.name}${isUngrouped ? "" : `\n${group.description}`}`;
+    heading.addEventListener("click", () => toggleProjectGroup(group.key));
 
     const mark = document.createElement("span");
     mark.className = "project-mark";
@@ -132,13 +137,6 @@ function renderThreadList() {
     const chevron = document.createElement("span");
     chevron.className = "project-chevron";
     chevron.setAttribute("aria-hidden", "true");
-    const nameToggle = document.createElement("button");
-    nameToggle.className = "project-name-toggle";
-    nameToggle.type = "button";
-    nameToggle.setAttribute("aria-expanded", String(!collapsed));
-    nameToggle.setAttribute("aria-controls", rowsId);
-    nameToggle.title = `${collapsed ? "展开" : "收起"} ${group.name}${isUngrouped ? "" : `\n${group.description}`}`;
-    nameToggle.addEventListener("click", () => toggleProjectGroup(group.key));
     const title = document.createElement("div");
     title.className = "project-heading-text";
     const name = document.createElement("strong");
@@ -151,8 +149,7 @@ function renderThreadList() {
     count.textContent = String(group.threads.length);
     count.setAttribute("aria-label", `${group.threads.length} 个对话`);
     title.append(name, description);
-    nameToggle.append(title);
-    heading.append(mark, chevron, nameToggle, count);
+    heading.append(mark, chevron, title, count);
 
     section.append(heading);
     const rows = document.createElement("div");

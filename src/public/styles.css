@@ -65,10 +65,9 @@ button { cursor: pointer; }
 .sidebar-content { display: flex; flex: 1; flex-direction: column; min-height: 0; gap: 8px; overflow: hidden; }
 .thread-list { display: flex; flex: 1; flex-direction: column; gap: 13px; min-width: 0; max-width: 100%; min-height: 0; overflow-x: hidden; overflow-y: auto; overscroll-behavior: contain; padding: 2px 2px 18px; }
 .project-group { display: grid; min-width: 0; max-width: 100%; gap: 6px; }
-.project-heading { position: sticky; z-index: 1; top: 0; display: grid; grid-template-columns: 15px 9px minmax(0, 1fr) auto; align-items: center; min-width: 0; max-width: 100%; min-height: 42px; gap: 8px; padding: 8px 9px; border: 1px solid var(--nav-project-border); border-left: 3px solid var(--nav-project-accent); border-radius: 6px; background: var(--nav-project-bg); color: var(--nav-project-text); transition: background .12s ease, border-color .12s ease; }
+.project-heading { position: sticky; z-index: 1; top: 0; display: grid; grid-template-columns: 15px 9px minmax(0, 1fr) auto; align-items: center; width: 100%; min-width: 0; max-width: 100%; min-height: 42px; gap: 8px; padding: 8px 9px; border: 1px solid var(--nav-project-border); border-left: 3px solid var(--nav-project-accent); border-radius: 6px; background: var(--nav-project-bg); color: var(--nav-project-text); text-align: left; transition: background .12s ease, border-color .12s ease; }
 .project-heading:hover { background: var(--nav-project-hover); border-color: var(--nav-project-accent); color: var(--text); }
-.project-name-toggle { width: 100%; min-width: 0; padding: 0; border: 0; background: transparent; color: inherit; text-align: left; }
-.project-name-toggle:focus-visible { outline: 2px solid var(--nav-project-accent); outline-offset: 3px; }
+.project-heading:focus-visible { outline: 2px solid var(--nav-project-accent); outline-offset: 2px; }
 .project-mark { position: relative; width: 14px; height: 10px; margin-top: 2px; border: 1px solid currentColor; border-radius: 2px; color: var(--nav-project-accent); }
 .project-mark::before { position: absolute; top: -4px; left: 1px; width: 6px; height: 3px; border: 1px solid currentColor; border-bottom: 0; border-radius: 2px 2px 0 0; content: ""; }
 .project-chevron { width: 7px; height: 7px; border-right: 1px solid currentColor; border-bottom: 1px solid currentColor; color: var(--dim); transform: rotate(45deg); transition: transform .14s ease; }
@@ -78,6 +77,7 @@ button { cursor: pointer; }
 .project-path { display: none; }
 .project-count { min-width: 23px; padding: 3px 6px; border-radius: 10px; background: var(--nav-project-count-bg); color: var(--nav-project-count-text); font-size: 11px; font-variant-numeric: tabular-nums; line-height: 1.2; text-align: center; }
 .project-threads { display: grid; min-width: 0; max-width: calc(100% - 18px); gap: 3px; margin: 0 3px 0 18px; padding-left: 10px; border-left: 1px solid var(--nav-thread-rail); }
+.project-threads[hidden] { display: none; }
 .thread-row { position: relative; width: 100%; min-width: 0; max-width: 100%; padding: 9px 10px; text-align: left; color: var(--text); background: transparent; border: 1px solid transparent; border-radius: 6px; transition: background .12s ease, border-color .12s ease; }
 .thread-row:hover { background: var(--nav-thread-hover); }
 .thread-row.selected { background: var(--nav-thread-selected); border-color: var(--nav-thread-selected-border); }
@@ -491,11 +491,11 @@ html[data-theme="glassmorphism"] .sidebar,
 html[data-theme="real-time-monitoring"] .sidebar,
 html[data-theme="data-dense-dashboard"] .sidebar,
 html[data-theme="accessible-ethical"] .sidebar,
-html[data-theme="swiss-modernism"] .project-heading,
 html[data-theme="glassmorphism"] .project-heading,
 html[data-theme="real-time-monitoring"] .project-heading,
 html[data-theme="data-dense-dashboard"] .project-heading,
 html[data-theme="accessible-ethical"] .project-heading { background: var(--nav-sidebar-bg); }
+html[data-theme="swiss-modernism"] .project-heading { background: var(--nav-project-bg); color: var(--nav-project-text); }
 html[data-theme="swiss-modernism"] .workspace,
 html[data-theme="glassmorphism"] .workspace,
 html[data-theme="real-time-monitoring"] .workspace,
