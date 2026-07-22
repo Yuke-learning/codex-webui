@@ -22,6 +22,8 @@ test("offers a settings preference for showing the CC Switch home control", asyn
   assert.match(html, /id="preference-setting-title">偏好设置</);
   assert.match(html, /id="show-cc-switch" type="checkbox"/);
   assert.match(html, /在主页显示 CC Switch 按钮/);
+  assert.match(html, /id="show-message-times" type="checkbox"/);
+  assert.match(html, /显示对话气泡时间/);
 });
 
 test("defines a full-width mobile provider sheet and 44px action targets", async () => {

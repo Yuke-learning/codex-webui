@@ -1,6 +1,12 @@
 import { classifyCodexEvent } from "./refresh-policy.js";
 import { describeLiveActivity } from "./live-activity.js";
-import { loadCcSwitchVisibility, saveCcSwitchVisibility } from "./preferences.js";
+import { messageTimeParts } from "./message-time.js";
+import {
+  loadCcSwitchVisibility,
+  loadMessageTimeVisibility,
+  saveCcSwitchVisibility,
+  saveMessageTimeVisibility,
+} from "./preferences.js";
 import { appendRichContent } from "./rich-content.js";
 import { toTranscript, transcriptSignature } from "./transcript.js";
 import { parseCodexUiSegments } from "./ui-directives.js";
@@ -42,6 +48,7 @@ const state = {
   activeView: "console",
   theme: loadThemePreference(),
   showCcSwitch: loadCcSwitchVisibility(),
+  showMessageTimes: loadMessageTimeVisibility(),
   mobileSidebarOpen: false,
 };
 
@@ -90,6 +97,7 @@ const elements = {
   closeSettings: $("#close-settings"),
   themeOptions: document.querySelectorAll("input[name=theme]"),
   showCcSwitch: $("#show-cc-switch"),
+  showMessageTimes: $("#show-message-times"),
   dialog: $("#new-thread-dialog"),
   newThreadForm: $("#new-thread-form"),
   cwdInput: $("#cwd-input"),
@@ -704,7 +712,9 @@ function renderMessages(thread, { follow = false } = {}) {
     elements.messages.append(empty);
   }
   for (const message of transcript.messages) {
-    elements.messages.append(message.role === "activityGroup" ? activityGroupNode(message) : messageNode(message.text, message.role, message.label));
+    elements.messages.append(message.role === "activityGroup"
+      ? activityGroupNode(message)
+      : messageNode(message.text, message.role, message.label, message.timestamp));
   }
   renderAutomationEvents(transcript.automationEvents);
   state.renderedThreadSignature = signature;
@@ -812,7 +822,7 @@ function isNearBottom(element) {
   return element.scrollHeight - element.scrollTop - element.clientHeight < 120;
 }
 
-function messageNode(text, role, label) {
+function messageNode(text, role, label, timestamp) {
   const node = document.createElement("article");
   node.className = `message ${role}`;
   const heading = document.createElement("span");
@@ -835,6 +845,15 @@ function messageNode(text, role, label) {
     content.textContent = text;
   }
   node.append(heading, content);
+  const messageTime = messageTimeParts(timestamp);
+  if (messageTime && RICH_MESSAGE_ROLES.has(role)) {
+    const time = document.createElement("time");
+    time.className = "message-time";
+    time.dateTime = messageTime.dateTime;
+    time.title = messageTime.title;
+    time.textContent = messageTime.label;
+    node.append(time);
+  }
   return node;
 }
 
@@ -1061,6 +1080,13 @@ function setCcSwitchVisibility(visible) {
   saveCcSwitchVisibility(state.showCcSwitch);
 }
 
+function setMessageTimeVisibility(visible) {
+  state.showMessageTimes = Boolean(visible);
+  elements.messages.classList.toggle("show-message-times", state.showMessageTimes);
+  elements.showMessageTimes.checked = state.showMessageTimes;
+  saveMessageTimeVisibility(state.showMessageTimes);
+}
+
 function showSettings() {
   stopRunningRefresh();
   state.activeView = "settings";
@@ -1168,6 +1194,9 @@ for (const input of elements.themeOptions) {
 }
 elements.showCcSwitch.addEventListener("change", () => {
   setCcSwitchVisibility(elements.showCcSwitch.checked);
+});
+elements.showMessageTimes.addEventListener("change", () => {
+  setMessageTimeVisibility(elements.showMessageTimes.checked);
 });
 $("#close-dialog").addEventListener("click", () => elements.dialog.close());
 $("#cancel-dialog").addEventListener("click", () => elements.dialog.close());
@@ -1381,6 +1410,7 @@ events.addEventListener("provider-switch", (event) => {
   try {
     setTheme(state.theme);
     setCcSwitchVisibility(state.showCcSwitch);
+    setMessageTimeVisibility(state.showMessageTimes);
     setMobileSidebar(false);
     await Promise.allSettled([
       refreshHealth(),

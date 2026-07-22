@@ -3,8 +3,11 @@ import test from "node:test";
 
 import {
   SHOW_CC_SWITCH_STORAGE_KEY,
+  SHOW_MESSAGE_TIMES_STORAGE_KEY,
   loadCcSwitchVisibility,
+  loadMessageTimeVisibility,
   saveCcSwitchVisibility,
+  saveMessageTimeVisibility,
 } from "../src/public/preferences.js";
 
 function memoryStorage(initial = {}) {
@@ -40,4 +43,14 @@ test("falls back to visible when browser storage is unavailable", () => {
   };
   assert.equal(loadCcSwitchVisibility(storage), true);
   assert.doesNotThrow(() => saveCcSwitchVisibility(false, storage));
+});
+
+test("hides message timestamps by default and persists the user's choice", () => {
+  const storage = memoryStorage();
+  assert.equal(loadMessageTimeVisibility(storage), false);
+  saveMessageTimeVisibility(true, storage);
+  assert.equal(storage.getItem(SHOW_MESSAGE_TIMES_STORAGE_KEY), "true");
+  assert.equal(loadMessageTimeVisibility(storage), true);
+  saveMessageTimeVisibility(false, storage);
+  assert.equal(loadMessageTimeVisibility(storage), false);
 });

@@ -1,4 +1,5 @@
 export const SHOW_CC_SWITCH_STORAGE_KEY = "codex-webui.show-cc-switch.v1";
+export const SHOW_MESSAGE_TIMES_STORAGE_KEY = "codex-webui.show-message-times.v1";
 
 export function loadCcSwitchVisibility(storage = globalThis.localStorage) {
   try {
@@ -12,6 +13,22 @@ export function loadCcSwitchVisibility(storage = globalThis.localStorage) {
 export function saveCcSwitchVisibility(visible, storage = globalThis.localStorage) {
   try {
     storage?.setItem(SHOW_CC_SWITCH_STORAGE_KEY, String(Boolean(visible)));
+  } catch {
+    // Keep the in-memory preference when browser storage is unavailable.
+  }
+}
+
+export function loadMessageTimeVisibility(storage = globalThis.localStorage) {
+  try {
+    return storage?.getItem(SHOW_MESSAGE_TIMES_STORAGE_KEY) === "true";
+  } catch {
+    return false;
+  }
+}
+
+export function saveMessageTimeVisibility(visible, storage = globalThis.localStorage) {
+  try {
+    storage?.setItem(SHOW_MESSAGE_TIMES_STORAGE_KEY, String(Boolean(visible)));
   } catch {
     // Keep the in-memory preference when browser storage is unavailable.
   }

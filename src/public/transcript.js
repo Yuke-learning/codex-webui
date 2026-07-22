@@ -25,11 +25,14 @@ export function toTranscript(thread) {
       if (normalized.kind === "automation") {
         flushActivities();
         appendAutomationEvent(automationEvents, normalized.event, rawIndex);
-      } else if (normalized.message.role === "activity") {
-        pendingActivities.push({ ...normalized.message, rawIndex });
       } else {
-        flushActivities();
-        messages.push(normalized.message);
+        const message = withTurnTimestamp(normalized.message, turn);
+        if (message.role === "activity") {
+          pendingActivities.push({ ...message, rawIndex });
+        } else {
+          flushActivities();
+          messages.push(message);
+        }
       }
       rawIndex += 1;
     }
@@ -101,6 +104,14 @@ function messageFromItem(item) {
   }
 
   return null;
+}
+
+function withTurnTimestamp(message, turn) {
+  if (message.role !== "user" && message.role !== "assistant") return message;
+  const timestamp = message.role === "user"
+    ? turn?.startedAt
+    : turn?.completedAt ?? turn?.startedAt;
+  return Number.isFinite(timestamp) && timestamp > 0 ? { ...message, timestamp } : message;
 }
 
 function activityGroupFrom(items, turnIndex) {

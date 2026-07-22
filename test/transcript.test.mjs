@@ -31,6 +31,24 @@ test("keeps native user, agent, and execution items in the transcript", () => {
   assert.deepEqual(transcript.automationEvents, []);
 });
 
+test("uses turn timestamps for user and Codex conversation bubbles", () => {
+  const transcript = toTranscript({
+    turns: [{
+      startedAt: 1_721_600_000,
+      completedAt: 1_721_600_042,
+      items: [
+        { type: "userMessage", content: [{ type: "text", text: "现在几点？" }] },
+        { type: "agentMessage", phase: "final", text: "这是本轮完成时间。" },
+      ],
+    }],
+  });
+
+  assert.deepEqual(transcript.messages, [
+    { role: "user", label: "你", text: "现在几点？", timestamp: 1_721_600_000 },
+    { role: "assistant", label: "Codex", text: "这是本轮完成时间。", timestamp: 1_721_600_042 },
+  ]);
+});
+
 test("renders commentary progress without confusing it with the final answer", () => {
   const transcript = toTranscript({
     turns: [{
