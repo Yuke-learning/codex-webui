@@ -1,6 +1,7 @@
 import path from "node:path";
 
-export const LAUNCHD_LABEL = "com.yuke.codex-webui";
+export const LAUNCHD_LABEL = "io.github.yuke-learning.codex-webui";
+export const LEGACY_LAUNCHD_LABELS = Object.freeze(["com.yuke.codex-webui"]);
 
 export function createLaunchAgentPlist({
   label = LAUNCHD_LABEL,
@@ -23,12 +24,13 @@ export function createLaunchAgentPlist({
     stderrPath,
     homeDirectory,
     codexBinary,
-    tailscaleBinary,
+    ...(tailscaleBinary ? { tailscaleBinary } : {}),
   };
   for (const [name, value] of Object.entries(absolutePaths)) {
     if (!path.isAbsolute(value ?? "")) throw new TypeError(`${name} must be an absolute path.`);
   }
   if (!label || !pathValue) throw new TypeError("label and pathValue are required.");
+  if (!Number.isInteger(port) || port < 1 || port > 65_535) throw new TypeError("port must be an integer between 1 and 65535.");
 
   const environment = {
     HOME: homeDirectory,
@@ -37,7 +39,7 @@ export function createLaunchAgentPlist({
     HOST: "127.0.0.1",
     PORT: String(port),
     CODEX_BIN: codexBinary,
-    TAILSCALE_BIN: tailscaleBinary,
+    ...(tailscaleBinary ? { TAILSCALE_BIN: tailscaleBinary } : {}),
   };
 
   return `<?xml version="1.0" encoding="UTF-8"?>

@@ -5,7 +5,7 @@ import { inspectTailscale } from "../src/tailscale-monitor.mjs";
 
 const connectedStatus = JSON.stringify({
   BackendState: "Running",
-  Self: { Online: true, DNSName: "yukemac.example.ts.net." },
+  Self: { Online: true, DNSName: "mac.example.ts.net." },
 });
 
 test("reports an existing matching Tailscale Serve route", async () => {
@@ -15,13 +15,13 @@ test("reports an existing matching Tailscale Serve route", async () => {
     runCommand: async (args) => {
       calls.push(args);
       if (args[0] === "status") return connectedStatus;
-      return JSON.stringify({ Web: { "yukemac.example.ts.net:443": { Handlers: { "/": { Proxy: "http://127.0.0.1:8787" } } } } });
+      return JSON.stringify({ Web: { "mac.example.ts.net:443": { Handlers: { "/": { Proxy: "http://127.0.0.1:8787" } } } } });
     },
   });
 
   assert.equal(result.connected, true);
   assert.equal(result.serveReady, true);
-  assert.equal(result.url, "https://yukemac.example.ts.net/");
+  assert.equal(result.url, "https://mac.example.ts.net/");
   assert.equal(calls.length, 2);
 });
 
@@ -38,7 +38,7 @@ test("configures Tailscale Serve when no route exists", async () => {
         return "";
       }
       return configured
-        ? JSON.stringify({ Web: { "yukemac.example.ts.net:443": { Handlers: { "/": { Proxy: "http://127.0.0.1:8787" } } } } })
+        ? JSON.stringify({ Web: { "mac.example.ts.net:443": { Handlers: { "/": { Proxy: "http://127.0.0.1:8787" } } } } })
         : "{}";
     },
   });
@@ -54,7 +54,7 @@ test("does not overwrite a conflicting Tailscale Serve configuration", async () 
     runCommand: async (args) => {
       calls.push(args);
       if (args[0] === "status") return connectedStatus;
-      return JSON.stringify({ Web: { "yukemac.example.ts.net:443": { Handlers: { "/": { Proxy: "http://127.0.0.1:3000" } } } } });
+      return JSON.stringify({ Web: { "mac.example.ts.net:443": { Handlers: { "/": { Proxy: "http://127.0.0.1:3000" } } } } });
     },
   });
 

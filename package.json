@@ -9,6 +9,7 @@
   },
   "scripts": {
     "build": "node scripts/build-client.mjs",
+    "check": "node scripts/check-syntax.mjs",
     "dev": "npm run build && node server.mjs",
     "start": "npm run build && node server.mjs",
     "service:install": "node scripts/launchd-service.mjs install",

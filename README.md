@@ -4,7 +4,7 @@
 
 本项目不会使用 ChatGPT App 的账户或云端任务管理能力；所有 Codex 请求继续由 Mac 上现有的 API / Responses 配置发起，网页只作为安全的远程控制台。
 
-设计方案见 [docs/remote-codex-console.md](docs/remote-codex-console.md)。
+设计方案见 [docs/remote-codex-console.md](docs/remote-codex-console.md)，从公开仓库全新部署见 [docs/installation.md](docs/installation.md)。
 
 ## 第一版运行方式
 
@@ -39,7 +39,7 @@ npm run service:restart
 npm run service:uninstall
 ```
 
-安装过程不需要 `sudo`，不会复制 Codex 或 Tailscale 凭据。生成的配置位于 `~/Library/LaunchAgents/com.yuke.codex-webui.plist`；日志写入仓库中已被 Git 忽略的 `logs/` 目录，并使用仅当前用户可访问的权限。LaunchAgent 固定监听 `127.0.0.1:8787`，外部访问仍只经过 Tailscale Serve。
+安装过程不需要 `sudo`，不会复制 Codex 或 Tailscale 凭据。生成的配置位于 `~/Library/LaunchAgents/io.github.yuke-learning.codex-webui.plist`；日志写入仓库中已被 Git 忽略的 `logs/` 目录，并使用仅当前用户可访问的权限。LaunchAgent 固定监听 `127.0.0.1:8787`，外部访问仍只经过 Tailscale Serve。安装器会自动迁移早期版本使用的 `com.yuke.codex-webui` 标签。
 
 配置会记录安装时解析到的稳定 Node.js、Codex CLI 和 Tailscale 二进制路径。升级或移动这些运行时后，重新执行一次 `npm run service:install`。
 

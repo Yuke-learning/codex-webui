@@ -6,18 +6,18 @@ import { parseCodexUiSegments, parseDirectiveLine } from "../src/public/ui-direc
 test("extracts consecutive Git directives from an assistant response", () => {
   const segments = parseCodexUiSegments(`已完成并推送。
 
-::git-stage{cwd="/Users/a1234/Code/Project/codex网页管理"}
-::git-commit{cwd="/Users/a1234/Code/Project/codex网页管理"}
-::git-push{cwd="/Users/a1234/Code/Project/codex网页管理" branch="main"}`);
+::git-stage{cwd="/Users/example/Code/codex-webui"}
+::git-commit{cwd="/Users/example/Code/codex-webui"}
+::git-push{cwd="/Users/example/Code/codex-webui" branch="main"}`);
 
   assert.deepEqual(segments, [
     { type: "markdown", text: "已完成并推送。\n" },
     {
       type: "git",
       directives: [
-        { name: "git-stage", attributes: { cwd: "/Users/a1234/Code/Project/codex网页管理" } },
-        { name: "git-commit", attributes: { cwd: "/Users/a1234/Code/Project/codex网页管理" } },
-        { name: "git-push", attributes: { cwd: "/Users/a1234/Code/Project/codex网页管理", branch: "main" } },
+        { name: "git-stage", attributes: { cwd: "/Users/example/Code/codex-webui" } },
+        { name: "git-commit", attributes: { cwd: "/Users/example/Code/codex-webui" } },
+        { name: "git-push", attributes: { cwd: "/Users/example/Code/codex-webui", branch: "main" } },
       ],
     },
   ]);

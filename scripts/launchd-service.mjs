@@ -6,7 +6,7 @@ import process from "node:process";
 import { spawnSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
 
-import { createLaunchAgentPlist, LAUNCHD_LABEL } from "../src/launchd-service.mjs";
+import { createLaunchAgentPlist, LAUNCHD_LABEL, LEGACY_LAUNCHD_LABELS } from "../src/launchd-service.mjs";
 
 const rootDir = path.dirname(path.dirname(fileURLToPath(import.meta.url)));
 const homeDirectory = os.homedir();
@@ -15,9 +15,10 @@ const action = process.argv[2] ?? "status";
 const launchDomain = `gui/${uid}`;
 const serviceTarget = `${launchDomain}/${LAUNCHD_LABEL}`;
 const launchAgentsDirectory = path.join(homeDirectory, "Library", "LaunchAgents");
-const plistPath = path.join(launchAgentsDirectory, `${LAUNCHD_LABEL}.plist`);
+const plistPath = plistPathFor(LAUNCHD_LABEL);
 const logsDirectory = path.join(rootDir, "logs");
 
+if (process.platform !== "darwin") throw new Error("The launchd service installer is only available on macOS.");
 if (!Number.isInteger(uid)) throw new Error("A macOS user session is required.");
 
 if (action === "install") await install();
@@ -29,11 +30,13 @@ else throw new Error("Usage: node scripts/launchd-service.mjs <install|restart|s
 async function install() {
   const nodeBinary = await realpath(process.execPath);
   const codexBinary = await resolveExecutable(process.env.CODEX_BIN ?? "codex");
-  const tailscaleBinary = await resolveExecutable(process.env.TAILSCALE_BIN ?? "tailscale");
+  const tailscaleBinary = process.env.TAILSCALE_BIN
+    ? await resolveExecutable(process.env.TAILSCALE_BIN)
+    : await resolveOptionalExecutable("tailscale");
   const pathValue = uniquePaths([
     path.dirname(nodeBinary),
     path.dirname(codexBinary),
-    path.dirname(tailscaleBinary),
+    tailscaleBinary ? path.dirname(tailscaleBinary) : null,
     "/usr/local/bin",
     "/opt/homebrew/bin",
     "/usr/bin",
@@ -62,9 +65,10 @@ async function install() {
   await writeFile(temporaryPath, plist, { encoding: "utf8", mode: 0o600 });
   await rename(temporaryPath, plistPath);
   run("/usr/bin/plutil", ["-lint", plistPath]);
-  run("/bin/launchctl", ["bootout", launchDomain, plistPath], { ignoreFailure: true });
+  for (const label of [LAUNCHD_LABEL, ...LEGACY_LAUNCHD_LABELS]) bootout(label);
   run("/bin/launchctl", ["enable", serviceTarget]);
   run("/bin/launchctl", ["bootstrap", launchDomain, plistPath]);
+  for (const legacyLabel of LEGACY_LAUNCHD_LABELS) await removePlist(legacyLabel);
   console.log(`Installed and started ${LAUNCHD_LABEL}.`);
   console.log(`LaunchAgent: ${plistPath}`);
   console.log(`Logs: ${logsDirectory}`);
@@ -80,10 +84,10 @@ function status() {
 }
 
 async function uninstallService() {
-  run("/bin/launchctl", ["bootout", launchDomain, plistPath], { ignoreFailure: true });
-  await unlink(plistPath).catch((error) => {
-    if (error?.code !== "ENOENT") throw error;
-  });
+  for (const label of [LAUNCHD_LABEL, ...LEGACY_LAUNCHD_LABELS]) {
+    bootout(label);
+    await removePlist(label);
+  }
   console.log(`Uninstalled ${LAUNCHD_LABEL}. Logs were kept at ${logsDirectory}.`);
 }
 
@@ -94,6 +98,28 @@ async function resolveExecutable(value) {
   const resolved = await realpath(candidate);
   await access(resolved, fsConstants.X_OK);
   return resolved;
+}
+
+async function resolveOptionalExecutable(value) {
+  try {
+    return await resolveExecutable(value);
+  } catch {
+    return null;
+  }
+}
+
+function bootout(label) {
+  run("/bin/launchctl", ["bootout", `${launchDomain}/${label}`], { ignoreFailure: true });
+}
+
+async function removePlist(label) {
+  await unlink(plistPathFor(label)).catch((error) => {
+    if (error?.code !== "ENOENT") throw error;
+  });
+}
+
+function plistPathFor(label) {
+  return path.join(launchAgentsDirectory, `${label}.plist`);
 }
 
 function uniquePaths(values) {
