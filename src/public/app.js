@@ -2,6 +2,7 @@ import { classifyCodexEvent } from "./refresh-policy.js";
 import { describeLiveActivity } from "./live-activity.js";
 import { appendRichContent } from "./rich-content.js";
 import { toTranscript, transcriptSignature } from "./transcript.js";
+import { parseCodexUiSegments } from "./ui-directives.js";
 
 const RICH_MESSAGE_ROLES = new Set(["user", "assistant"]);
 const MAX_RICH_MESSAGE_LENGTH = 100_000;
@@ -41,6 +42,7 @@ const state = {
 const $ = (selector) => document.querySelector(selector);
 const elements = {
   status: $("#connection-status"),
+  networkAccess: $("#network-access"),
   sidebar: $("#sidebar"),
   mobileSidebarToggle: $("#open-mobile-sidebar"),
   mobileSidebarClose: $("#close-mobile-sidebar"),
@@ -93,9 +95,40 @@ async function api(path, options = {}) {
 async function refreshHealth() {
   const health = await api("/api/health");
   state.health = health;
-  elements.status.textContent = health.ok ? "Mac 上的 Codex 已连接" : "Codex 服务未连接";
-  elements.status.className = `connection-status ${health.ok ? "online" : "offline"}`;
+  renderConnectionHealth();
   if (!health.ok) showToast(health.hint ?? health.error, "error", 8000);
+}
+
+function renderConnectionHealth() {
+  const health = state.health ?? {};
+  const network = health.network ?? {};
+  const networkReady = Boolean(network.connected && network.serveReady && network.url);
+  const networkChecked = Boolean(network.checkedAt);
+
+  if (!health.ok) {
+    elements.status.textContent = "Codex 服务未连接";
+    elements.status.className = "connection-status offline";
+  } else if (networkReady) {
+    elements.status.textContent = "Codex 与 Tailscale 已连接";
+    elements.status.className = "connection-status online";
+  } else if (!networkChecked) {
+    elements.status.textContent = "Codex 已连接 · 正在检查 Tailscale";
+    elements.status.className = "connection-status";
+  } else {
+    elements.status.textContent = `Codex 已连接 · ${network.connected ? "Tailnet 入口不可用" : "Tailscale 未连接"}`;
+    elements.status.className = "connection-status warning";
+  }
+
+  elements.networkAccess.classList.toggle("hidden", !networkReady);
+  if (networkReady) {
+    elements.networkAccess.href = network.url;
+    elements.networkAccess.textContent = network.url.replace(/^https:\/\//, "").replace(/\/$/, "");
+    elements.networkAccess.title = `在其他 Tailnet 设备打开 ${network.url}`;
+  } else {
+    elements.networkAccess.removeAttribute("href");
+    elements.networkAccess.textContent = "";
+    elements.networkAccess.title = network.error ?? "";
+  }
 }
 
 async function loadModels() {
@@ -596,7 +629,8 @@ function messageNode(text, role, label) {
   if (RICH_MESSAGE_ROLES.has(role) && text.length <= MAX_RICH_MESSAGE_LENGTH) {
     content.classList.add("rich");
     try {
-      appendRichContent(content, text);
+      if (role === "assistant") appendAssistantContent(content, text);
+      else appendRichContent(content, text);
     } catch (error) {
       console.warn("Rich message rendering failed; using plain text.", error);
       content.className = "message-content plain";
@@ -608,6 +642,95 @@ function messageNode(text, role, label) {
   }
   node.append(heading, content);
   return node;
+}
+
+function appendAssistantContent(container, text) {
+  const segments = parseCodexUiSegments(text);
+  if (!segments.length) {
+    appendRichContent(container, text);
+    return;
+  }
+
+  for (const segment of segments) {
+    if (segment.type === "markdown") appendRichContent(container, segment.text);
+    else if (segment.type === "git") container.append(gitDirectiveCard(segment.directives));
+  }
+}
+
+function gitDirectiveCard(directives) {
+  const card = document.createElement("section");
+  card.className = "codex-git-card";
+  card.setAttribute("aria-label", "Git 操作");
+
+  const heading = document.createElement("div");
+  heading.className = "codex-git-card-heading";
+  const mark = document.createElement("span");
+  mark.className = "codex-git-card-mark";
+  mark.setAttribute("aria-hidden", "true");
+  mark.textContent = "⑂";
+  const title = document.createElement("strong");
+  title.textContent = "Git 操作";
+  heading.append(mark, title);
+
+  const list = document.createElement("div");
+  list.className = "codex-git-card-list";
+  for (const directive of directives) list.append(gitDirectiveRow(directive));
+  card.append(heading, list);
+
+  const directories = [...new Set(directives.map((directive) => directive.attributes.cwd).filter(Boolean))];
+  if (directories.length === 1) {
+    const directory = document.createElement("div");
+    directory.className = "codex-git-card-directory";
+    directory.title = directories[0];
+    directory.textContent = directories[0];
+    card.append(directory);
+  }
+  return card;
+}
+
+function gitDirectiveRow(directive) {
+  const presentation = {
+    "git-stage": { icon: "✓", label: "已暂存更改" },
+    "git-commit": { icon: "✓", label: "已创建提交" },
+    "git-push": { icon: "↑", label: "已推送到远程仓库" },
+    "git-create-branch": { icon: "⑂", label: "已创建分支" },
+    "git-create-pr": { icon: "↗", label: directive.attributes.isDraft === "true" ? "已创建草稿 PR" : "已创建 PR" },
+  }[directive.name] ?? { icon: "✓", label: directive.name };
+
+  const row = document.createElement("div");
+  row.className = `codex-git-card-row directive-${directive.name}`;
+  const icon = document.createElement("span");
+  icon.className = "codex-git-card-icon";
+  icon.setAttribute("aria-hidden", "true");
+  icon.textContent = presentation.icon;
+  const label = document.createElement("span");
+  label.className = "codex-git-card-label";
+  label.textContent = presentation.label;
+  row.append(icon, label);
+
+  const metadata = directive.name === "git-create-pr"
+    ? directive.attributes.url
+    : directive.attributes.branch || directive.attributes.url;
+  if (metadata) {
+    const detail = document.createElement(directive.name === "git-create-pr" && safeHttpsUrl(metadata) ? "a" : "span");
+    detail.className = "codex-git-card-detail";
+    detail.textContent = directive.attributes.branch || "打开 PR";
+    if (detail.tagName === "A") {
+      detail.href = metadata;
+      detail.target = "_blank";
+      detail.rel = "noopener noreferrer";
+    }
+    row.append(detail);
+  }
+  return row;
+}
+
+function safeHttpsUrl(value) {
+  try {
+    return new URL(value).protocol === "https:";
+  } catch {
+    return false;
+  }
 }
 
 function activityGroupNode(group) {
@@ -992,6 +1115,18 @@ events.addEventListener("approval", (event) => {
   showToast("Codex 正在等待审批，请在桌面 App 中审阅。", "error", 8000);
 });
 events.addEventListener("transport-error", () => refreshHealth().catch(() => undefined));
+events.addEventListener("network-status", (event) => {
+  try {
+    const previousReady = Boolean(state.health?.network?.serveReady);
+    const network = JSON.parse(event.data);
+    state.health = { ...(state.health ?? {}), network };
+    renderConnectionHealth();
+    if (previousReady && !network.serveReady) showToast(network.error ?? "Tailscale 连接已中断。", "error", 8000);
+    else if (!previousReady && network.serveReady) showToast(`Tailnet 访问已就绪：${network.url}`, "info", 5000);
+  } catch (error) {
+    console.warn("Ignored malformed network status event.", error);
+  }
+});
 
 (async () => {
   try {

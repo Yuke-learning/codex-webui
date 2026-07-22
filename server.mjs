@@ -7,12 +7,19 @@ import { fileURLToPath } from "node:url";
 
 import { CodexGateway, InputError } from "./src/codex-gateway.mjs";
 import { shouldForwardCodexEvent } from "./src/public/refresh-policy.js";
+import { TailscaleMonitor } from "./src/tailscale-monitor.mjs";
 
 const rootDir = path.dirname(fileURLToPath(import.meta.url));
 const publicDir = path.join(rootDir, "dist", "public");
 const host = process.env.HOST ?? "127.0.0.1";
 const port = Number.parseInt(process.env.PORT ?? "8787", 10);
 const gateway = new CodexGateway({ codexBin: process.env.CODEX_BIN ?? "codex" });
+const tailscaleMonitor = new TailscaleMonitor({
+  target: `http://127.0.0.1:${port}`,
+  tailscaleBin: process.env.TAILSCALE_BIN ?? "tailscale",
+  intervalMs: Number.parseInt(process.env.TAILSCALE_CHECK_INTERVAL_MS ?? "15000", 10),
+  autoConfigure: process.env.TAILSCALE_AUTO_SERVE !== "false",
+});
 const eventClients = new Set();
 
 const staticFiles = new Map([
@@ -26,6 +33,11 @@ gateway.on("notification", (event) => {
 });
 gateway.on("serverRequest", (event) => broadcast("approval", event));
 gateway.on("transportError", (event) => broadcast("transport-error", event));
+tailscaleMonitor.on("change", (status) => {
+  broadcast("network-status", status);
+  if (status.serveReady) console.log(`Tailnet access ready: ${status.url}`);
+  else console.warn(`Tailnet access unavailable: ${status.error ?? "Tailscale Serve is not ready."}`);
+});
 
 const server = createServer(async (request, response) => {
   try {
@@ -46,7 +58,8 @@ const server = createServer(async (request, response) => {
 
 server.listen(port, host, () => {
   console.log(`Codex WebUI listening on http://${host}:${port}`);
-  console.log("The server is intentionally loopback-only. Publish it through an authenticated private network such as Tailscale.");
+  console.log("The server is intentionally loopback-only. Tailscale Serve is monitored for authenticated Tailnet access.");
+  tailscaleMonitor.start();
 });
 
 function writeSse(response, event, data) {
@@ -66,7 +79,7 @@ async function handleApi(request, response, url) {
   const { pathname } = url;
 
   if (request.method === "GET" && pathname === "/api/health") {
-    respondJson(response, 200, await gateway.health());
+    respondJson(response, 200, { ...await gateway.health(), network: tailscaleMonitor.current() });
     return;
   }
 
@@ -264,6 +277,7 @@ function respondError(response, error) {
 function shutdown() {
   for (const client of eventClients) client.end();
   eventClients.clear();
+  tailscaleMonitor.stop();
   gateway.close();
   server.close(() => process.exit(0));
 }

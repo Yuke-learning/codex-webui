@@ -57,6 +57,9 @@ button { cursor: pointer; }
 .connection-status { display: block; margin-top: 2px; color: var(--dim); font-size: 12px; }
 .connection-status.online { color: var(--accent); }
 .connection-status.offline { color: var(--danger); }
+.connection-status.warning { color: #d8a23c; }
+.network-access { display: block; max-width: 190px; margin-top: 2px; overflow: hidden; color: var(--muted); font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 10px; text-decoration: none; text-overflow: ellipsis; white-space: nowrap; }
+.network-access:hover { color: var(--accent); text-decoration: underline; }
 .settings-button { flex: 0 0 auto; margin-left: auto; font-size: 17px; }
 .settings-button.active { background: var(--panel-strong); color: var(--text); }
 
@@ -201,6 +204,17 @@ button { cursor: pointer; }
 .message-content.rich .hljs-doctag { color: var(--code-meta); }
 .message-content.rich .hljs-addition { color: var(--code-addition); background: rgba(46, 160, 67, .18); }
 .message-content.rich .hljs-deletion { color: var(--code-deletion); background: rgba(248, 81, 73, .18); }
+.codex-git-card { margin: 14px 0; overflow: hidden; border: 1px solid var(--line); border-radius: 9px; background: var(--panel); color: var(--text); }
+.codex-git-card-heading { display: flex; align-items: center; gap: 8px; min-height: 38px; padding: 0 12px; border-bottom: 1px solid var(--line); }
+.codex-git-card-heading strong { font-size: 12px; letter-spacing: .04em; }
+.codex-git-card-mark { color: var(--accent); font-size: 17px; }
+.codex-git-card-list { display: grid; gap: 1px; background: var(--line); }
+.codex-git-card-row { display: grid; grid-template-columns: 22px minmax(0, 1fr) auto; align-items: center; gap: 7px; min-height: 38px; padding: 6px 12px; background: var(--assistant); font-size: 12px; }
+.codex-git-card-icon { display: grid; place-items: center; width: 20px; height: 20px; border-radius: 50%; background: var(--panel-strong); color: var(--accent); font-weight: 800; }
+.codex-git-card-label { min-width: 0; font-weight: 650; }
+.codex-git-card-detail { max-width: 220px; overflow: hidden; padding: 2px 7px; border-radius: 10px; background: var(--panel-strong); color: var(--muted); font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 11px; text-decoration: none; text-overflow: ellipsis; white-space: nowrap; }
+a.codex-git-card-detail:hover { color: var(--accent); text-decoration: underline; }
+.codex-git-card-directory { overflow: hidden; padding: 8px 12px; border-top: 1px solid var(--line); color: var(--dim); font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 11px; text-overflow: ellipsis; white-space: nowrap; }
 .empty-messages { color: var(--muted); text-align: center; padding: 48px 0; }
 .live-activity { display: flex; align-items: flex-start; gap: 10px; max-width: 880px; margin: 18px auto 0; padding: 12px 14px; border: 1px solid var(--line); border-left: 3px solid var(--accent); border-radius: 8px; background: var(--panel); color: var(--muted); }
 .live-activity-indicator { flex: 0 0 auto; width: 8px; height: 8px; margin-top: 6px; border-radius: 50%; background: var(--accent); animation: activity-pulse 1.5s ease-in-out infinite; }
@@ -772,6 +786,8 @@ html[data-theme="accessible-ethical"] :focus-visible { outline: 3px solid #ffe60
   .activity-group summary { align-items: flex-start; min-height: 48px; padding: 11px 12px; }
   .activity-group-latest { flex-basis: 100%; margin-left: 29px; text-align: left; }
   .activity-group-item { grid-template-columns: 1fr; gap: 2px; }
+  .codex-git-card-row { grid-template-columns: 22px minmax(0, 1fr); }
+  .codex-git-card-detail { grid-column: 2; justify-self: start; max-width: 100%; }
   .composer { width: calc(100% - 20px); margin: 8px auto calc(10px + env(safe-area-inset-bottom)); border-radius: 8px; }
   .composer textarea { min-height: 68px; }
   .composer-bottom { padding-left: 12px; }
