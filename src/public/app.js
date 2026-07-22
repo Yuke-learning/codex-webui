@@ -29,7 +29,8 @@ const state = {
   listRefreshTimer: null,
   detailRefreshTimer: null,
   runningRefreshTimer: null,
-  detailRefreshInFlight: false,
+  detailRefreshInFlight: null,
+  fullSyncInFlight: false,
   liveActivity: null,
   listRequestId: 0,
   detailRequestId: 0,
@@ -49,6 +50,7 @@ const elements = {
   mobileSidebarBackdrop: $("#mobile-sidebar-backdrop"),
   list: $("#thread-list"),
   count: $("#thread-count"),
+  refreshThreads: $("#refresh-threads"),
   search: $("#search"),
   header: $("#thread-header"),
   title: $("#thread-title"),
@@ -138,15 +140,58 @@ async function loadModels() {
   if (state.selectedThread) renderThreadSettings(state.selectedThread);
 }
 
-async function loadThreads() {
+async function loadThreads({ syncAll = false } = {}) {
   const requestId = ++state.listRequestId;
   const search = elements.search.value.trim();
-  const payload = await api(`/api/threads?archived=false&search=${encodeURIComponent(search)}`);
-  if (requestId !== state.listRequestId) return false;
-  state.threads = payload.data;
-  elements.count.textContent = `${payload.data.length} 个对话`;
+  const requestSearch = syncAll ? "" : search;
+  const payload = await api(`/api/threads?archived=false&search=${encodeURIComponent(requestSearch)}`);
+  const allThreads = Array.isArray(payload.data) ? payload.data : [];
+  const visibleThreads = syncAll && search ? allThreads.filter((thread) => threadMatchesSearch(thread, search)) : allThreads;
+  if (requestId !== state.listRequestId) {
+    return { applied: false, total: allThreads.length, visible: visibleThreads.length };
+  }
+  state.threads = visibleThreads;
+  elements.count.textContent = `${visibleThreads.length} 个对话`;
   renderThreadList();
-  return true;
+  return { applied: true, total: allThreads.length, visible: visibleThreads.length };
+}
+
+function threadMatchesSearch(thread, value) {
+  const query = value.toLocaleLowerCase();
+  return [threadTitle(thread), thread.cwd]
+    .filter(Boolean)
+    .some((candidate) => String(candidate).toLocaleLowerCase().includes(query));
+}
+
+async function syncAllThreads() {
+  if (state.fullSyncInFlight) return;
+  state.fullSyncInFlight = true;
+  setFullSyncBusy(true);
+  clearTimeout(state.listRefreshTimer);
+  clearTimeout(state.detailRefreshTimer);
+
+  try {
+    const result = await loadThreads({ syncAll: true });
+    const detailSynced = state.selectedId
+      ? await refreshSelectedThread({ follow: false, force: true, throwOnError: true })
+      : false;
+    const visibleNote = result.visible === result.total ? "" : `，当前筛选显示 ${result.visible} 个`;
+    showToast(`已同步 ${result.total} 个对话${detailSynced ? "及当前任务详情" : ""}${visibleNote}。`, "info");
+  } catch (error) {
+    showToast(`同步失败：${error.message}`, "error", 8000);
+  } finally {
+    state.fullSyncInFlight = false;
+    setFullSyncBusy(false);
+  }
+}
+
+function setFullSyncBusy(busy) {
+  elements.refreshThreads.disabled = busy;
+  elements.refreshThreads.classList.toggle("is-syncing", busy);
+  elements.refreshThreads.setAttribute("aria-busy", String(busy));
+  const label = busy ? "正在同步全部对话和当前任务" : "同步全部对话和当前任务";
+  elements.refreshThreads.title = label;
+  elements.refreshThreads.setAttribute("aria-label", label);
 }
 
 function renderThreadList() {
@@ -329,21 +374,25 @@ async function selectThread(threadId, { follow = true } = {}) {
   }
 }
 
-async function refreshSelectedThread({ follow = false } = {}) {
+async function refreshSelectedThread({ follow = false, force = false, throwOnError = false } = {}) {
   const threadId = state.selectedId;
-  if (!threadId || state.detailRefreshInFlight) return;
-  state.detailRefreshInFlight = true;
+  if (!threadId || (!force && state.detailRefreshInFlight)) return false;
+  const refreshToken = { threadId };
+  state.detailRefreshInFlight = refreshToken;
   const requestId = ++state.detailRequestId;
 
   try {
     const payload = await api(`/api/threads/${encodeURIComponent(threadId)}`);
-    if (requestId !== state.detailRequestId || threadId !== state.selectedId) return;
+    if (requestId !== state.detailRequestId || threadId !== state.selectedId) return false;
     state.selectedThread = payload.thread;
     renderSelectedThread({ follow });
+    return true;
   } catch (error) {
+    if (throwOnError) throw error;
     console.warn(error);
+    return false;
   } finally {
-    state.detailRefreshInFlight = false;
+    if (state.detailRefreshInFlight === refreshToken) state.detailRefreshInFlight = null;
   }
 }
 
@@ -967,7 +1016,7 @@ for (const input of elements.themeOptions) {
 }
 $("#close-dialog").addEventListener("click", () => elements.dialog.close());
 $("#cancel-dialog").addEventListener("click", () => elements.dialog.close());
-$("#refresh-threads").addEventListener("click", () => loadThreads().catch((error) => showToast(error.message, "error")));
+elements.refreshThreads.addEventListener("click", syncAllThreads);
 elements.search.addEventListener("input", () => {
   scheduleListRefresh(250);
 });
@@ -1088,6 +1137,7 @@ function clearSelection() {
   stopRunningRefresh();
   clearTimeout(state.detailRefreshTimer);
   state.detailRequestId += 1;
+  state.detailRefreshInFlight = null;
   state.selectedId = null;
   state.selectedThread = null;
   state.liveActivity = null;

@@ -51,15 +51,19 @@ export class CodexGateway extends EventEmitter {
   }
 
   async listThreads({ archived = false, searchTerm, cwd } = {}) {
-    const result = await this.#request("thread/list", {
+    const params = {
       archived,
       searchTerm: optionalText(searchTerm),
       cwd: optionalText(cwd),
       sortKey: "updated_at",
       sortDirection: "desc",
       limit: 100,
-    });
-    return (result.data ?? []).map(toThreadSummary);
+    };
+    const threads = await collectPaginatedThreadData((cursor) => this.#request("thread/list", {
+      ...params,
+      ...(cursor ? { cursor } : {}),
+    }));
+    return threads.map(toThreadSummary);
   }
 
   async listModels() {
@@ -273,6 +277,30 @@ function optionalText(value) {
 function isThreadRunning(status) {
   if (typeof status === "string") return ["running", "active"].includes(status);
   return status?.type === "running" || status?.status === "running";
+}
+
+export async function collectPaginatedThreadData(fetchPage) {
+  const threads = [];
+  const seenThreadIds = new Set();
+  const seenCursors = new Set();
+  let cursor;
+
+  do {
+    const result = await fetchPage(cursor);
+    for (const thread of result?.data ?? []) {
+      if (thread?.id && seenThreadIds.has(thread.id)) continue;
+      if (thread?.id) seenThreadIds.add(thread.id);
+      threads.push(thread);
+    }
+
+    const nextCursor = optionalText(result?.nextCursor);
+    if (!nextCursor) break;
+    if (seenCursors.has(nextCursor)) throw new CodexRpcError("Codex thread/list returned a repeated pagination cursor.");
+    seenCursors.add(nextCursor);
+    cursor = nextCursor;
+  } while (cursor);
+
+  return threads;
 }
 
 function toThreadSummary(thread) {
