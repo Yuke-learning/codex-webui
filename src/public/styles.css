@@ -18,6 +18,10 @@
   --nav-project-border: #363d48;
   --nav-project-accent: #9fe870;
   --nav-project-text: #e8ebef;
+  --nav-project-hover-text: var(--nav-project-text);
+  --nav-project-secondary-text: var(--nav-project-text);
+  --nav-ungrouped-text: var(--muted);
+  --nav-ungrouped-hover-text: var(--nav-project-hover-text);
   --nav-project-count-bg: #2b323d;
   --nav-project-count-text: #d1d7df;
   --nav-thread-rail: #353b46;
@@ -82,11 +86,12 @@ button { cursor: pointer; }
 .thread-list { display: flex; flex: 1; flex-direction: column; gap: 13px; min-width: 0; max-width: 100%; min-height: 0; overflow-x: hidden; overflow-y: auto; overscroll-behavior: contain; padding: 2px 2px 18px; }
 .project-group { display: grid; min-width: 0; max-width: 100%; gap: 6px; }
 .project-heading { position: sticky; z-index: 1; top: 0; display: grid; grid-template-columns: 15px 9px minmax(0, 1fr) auto; align-items: center; width: 100%; min-width: 0; max-width: 100%; min-height: 42px; gap: 8px; padding: 8px 9px; border: 1px solid var(--nav-project-border); border-left: 3px solid var(--nav-project-accent); border-radius: 6px; background: var(--nav-project-bg); color: var(--nav-project-text); text-align: left; transition: background .12s ease, border-color .12s ease; }
-.project-heading:hover { background: var(--nav-project-hover); border-color: var(--nav-project-accent); color: var(--text); }
+.project-heading:hover { background: var(--nav-project-hover); border-color: var(--nav-project-accent); color: var(--nav-project-hover-text); }
 .project-heading:focus-visible { outline: 2px solid var(--nav-project-accent); outline-offset: 2px; }
 .project-mark { position: relative; width: 14px; height: 10px; margin-top: 2px; border: 1px solid currentColor; border-radius: 2px; color: var(--nav-project-accent); }
 .project-mark::before { position: absolute; top: -4px; left: 1px; width: 6px; height: 3px; border: 1px solid currentColor; border-bottom: 0; border-radius: 2px 2px 0 0; content: ""; }
-.project-chevron { width: 7px; height: 7px; border-right: 1px solid currentColor; border-bottom: 1px solid currentColor; color: var(--dim); transform: rotate(45deg); transition: transform .14s ease; }
+.project-chevron { width: 7px; height: 7px; border-right: 1px solid currentColor; border-bottom: 1px solid currentColor; color: var(--nav-project-secondary-text); opacity: .72; transform: rotate(45deg); transition: color .12s ease, opacity .12s ease, transform .14s ease; }
+.project-heading:hover .project-chevron { color: var(--nav-project-hover-text); opacity: 1; }
 .project-group.is-collapsed .project-chevron { transform: rotate(-45deg); }
 .project-heading-text { display: grid; min-width: 0; gap: 1px; }
 .project-heading strong { overflow: hidden; color: inherit; font-size: 12px; font-weight: 750; letter-spacing: 0; text-overflow: ellipsis; white-space: nowrap; }
@@ -101,7 +106,8 @@ button { cursor: pointer; }
 .thread-row-title { overflow: hidden; font-size: 13px; font-weight: 650; text-overflow: ellipsis; white-space: nowrap; }
 .thread-row.selected .thread-row-title { font-weight: 750; }
 .thread-row-meta { display: flex; gap: 7px; align-items: center; margin-top: 5px; color: var(--dim); font-size: 11px; }
-.project-group.is-ungrouped .project-heading { border-style: dashed; border-left-color: var(--nav-ungrouped-accent); background: transparent; color: var(--muted); }
+.project-group.is-ungrouped .project-heading { border-style: dashed; border-left-color: var(--nav-ungrouped-accent); background: transparent; color: var(--nav-ungrouped-text); }
+.project-group.is-ungrouped .project-heading:hover { background: var(--nav-project-hover); color: var(--nav-ungrouped-hover-text); }
 .project-group.is-ungrouped .project-mark { width: 8px; height: 8px; margin-left: 3px; border-radius: 50%; color: var(--nav-ungrouped-accent); }
 .project-group.is-ungrouped .project-mark::before { display: none; }
 .project-group.is-ungrouped .project-threads { border-left-style: dashed; }
@@ -329,8 +335,8 @@ html[data-theme="liquid-glass"] .app-shell::after { position: absolute; z-index:
 html[data-theme="liquid-glass"] .app-shell::before { top: -34%; right: -16%; background: #3869e2; animation: glass-drift 24s ease-in-out infinite alternate; }
 html[data-theme="liquid-glass"] .app-shell::after { bottom: -46%; left: 15%; background: #b32c9f; animation: glass-drift 29s ease-in-out infinite alternate-reverse; }
 html[data-theme="liquid-glass"] .sidebar,
-html[data-theme="liquid-glass"] .workspace,
-html[data-theme="liquid-glass"] .project-heading { background: var(--nav-sidebar-bg); }
+html[data-theme="liquid-glass"] .workspace { background: var(--nav-sidebar-bg); }
+html[data-theme="liquid-glass"] .project-heading { background: var(--nav-project-bg); }
 html[data-theme="liquid-glass"] .sidebar,
 html[data-theme="liquid-glass"] .workspace { backdrop-filter: blur(20px) saturate(1.2); }
 html[data-theme="liquid-glass"] .workspace { background: linear-gradient(125deg, rgba(28, 34, 78, .27), rgba(23, 15, 55, .16)); }
@@ -614,11 +620,11 @@ html[data-theme="swiss-modernism"] .sidebar,
 html[data-theme="glassmorphism"] .sidebar,
 html[data-theme="real-time-monitoring"] .sidebar,
 html[data-theme="data-dense-dashboard"] .sidebar,
-html[data-theme="accessible-ethical"] .sidebar,
+html[data-theme="accessible-ethical"] .sidebar { background: var(--nav-sidebar-bg); }
 html[data-theme="glassmorphism"] .project-heading,
 html[data-theme="real-time-monitoring"] .project-heading,
 html[data-theme="data-dense-dashboard"] .project-heading,
-html[data-theme="accessible-ethical"] .project-heading { background: var(--nav-sidebar-bg); }
+html[data-theme="accessible-ethical"] .project-heading { background: var(--nav-project-bg); }
 html[data-theme="swiss-modernism"] .project-heading { background: var(--nav-project-bg); color: var(--nav-project-text); }
 html[data-theme="swiss-modernism"] .workspace,
 html[data-theme="glassmorphism"] .workspace,
@@ -632,7 +638,6 @@ html[data-theme="glassmorphism"] .project-heading:hover,
 html[data-theme="real-time-monitoring"] .project-heading:hover,
 html[data-theme="data-dense-dashboard"] .project-heading:hover,
 html[data-theme="accessible-ethical"] .project-heading:hover { background: var(--nav-project-hover); }
-html[data-theme="swiss-modernism"] .project-heading:hover { color: var(--nav-project-text); }
 html[data-theme="swiss-modernism"] .thread-row:hover,
 html[data-theme="glassmorphism"] .thread-row:hover,
 html[data-theme="real-time-monitoring"] .thread-row:hover,
