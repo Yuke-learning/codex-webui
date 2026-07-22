@@ -21,6 +21,7 @@ const state = {
   models: [],
   threadSettings: new Map(),
   collapsedProjectKeys: loadCollapsedProjectKeys(),
+  expandedActivityGroupKeys: loadExpandedActivityGroupKeys(),
   selectedId: null,
   selectedThread: null,
   health: null,
@@ -223,6 +224,23 @@ function persistCollapsedProjectKeys() {
     localStorage.setItem("codex-webui.collapsed-projects.v1", JSON.stringify([...state.collapsedProjectKeys]));
   } catch {
     // The page still works when browser storage is unavailable.
+  }
+}
+
+function loadExpandedActivityGroupKeys() {
+  try {
+    const stored = JSON.parse(localStorage.getItem("codex-webui.expanded-activity-groups.v1") ?? "[]");
+    return new Set(Array.isArray(stored) ? stored.filter((key) => typeof key === "string") : []);
+  } catch {
+    return new Set();
+  }
+}
+
+function persistExpandedActivityGroupKeys() {
+  try {
+    localStorage.setItem("codex-webui.expanded-activity-groups.v1", JSON.stringify([...state.expandedActivityGroupKeys]));
+  } catch {
+    // The selected groups remain expanded for this session when storage is unavailable.
   }
 }
 
@@ -458,7 +476,9 @@ function renderMessages(thread, { follow = false } = {}) {
     empty.textContent = "这个线程还没有可显示的消息。发送第一条指令开始吧。";
     elements.messages.append(empty);
   }
-  for (const message of transcript.messages) elements.messages.append(messageNode(message.text, message.role, message.label));
+  for (const message of transcript.messages) {
+    elements.messages.append(message.role === "activityGroup" ? activityGroupNode(message) : messageNode(message.text, message.role, message.label));
+  }
   renderAutomationEvents(transcript.automationEvents);
   state.renderedThreadSignature = signature;
   if (shouldFollow) elements.view.scrollTop = elements.view.scrollHeight;
@@ -588,6 +608,59 @@ function messageNode(text, role, label) {
   }
   node.append(heading, content);
   return node;
+}
+
+function activityGroupNode(group) {
+  const key = activityGroupKey(group.id);
+  const node = document.createElement("details");
+  node.className = `activity-group${group.hasProblem ? " has-problem" : ""}`;
+  node.open = group.hasProblem || state.expandedActivityGroupKeys.has(key);
+  node.dataset.activityGroupId = group.id;
+
+  const summary = document.createElement("summary");
+  const heading = document.createElement("div");
+  heading.className = "activity-group-heading";
+  const title = document.createElement("strong");
+  title.textContent = group.label;
+  const count = document.createElement("span");
+  count.className = "activity-group-count";
+  count.textContent = `${group.count} 项`;
+  const types = document.createElement("span");
+  types.className = "activity-group-types";
+  types.textContent = group.summary;
+  heading.append(title, count, types);
+
+  const latest = document.createElement("span");
+  latest.className = "activity-group-latest";
+  latest.textContent = `最近：${group.latest.label} · ${group.latest.text}`;
+  summary.append(heading, latest);
+  node.append(summary);
+
+  const list = document.createElement("div");
+  list.className = "activity-group-list";
+  for (const item of group.items) {
+    const row = document.createElement("article");
+    row.className = `activity-group-item activity-${item.activityType ?? "progress"}`;
+    const itemLabel = document.createElement("span");
+    itemLabel.className = "activity-group-item-label";
+    itemLabel.textContent = item.label;
+    const itemText = document.createElement("span");
+    itemText.className = "activity-group-item-text";
+    itemText.textContent = item.text;
+    row.append(itemLabel, itemText);
+    list.append(row);
+  }
+  node.append(list);
+  node.addEventListener("toggle", () => {
+    if (node.open) state.expandedActivityGroupKeys.add(key);
+    else state.expandedActivityGroupKeys.delete(key);
+    persistExpandedActivityGroupKeys();
+  });
+  return node;
+}
+
+function activityGroupKey(groupId) {
+  return `${state.selectedId ?? "unknown"}\u0000${groupId}`;
 }
 
 function threadTitle(thread) {

@@ -17,7 +17,16 @@ test("keeps native user, agent, and execution items in the transcript", () => {
   assert.deepEqual(transcript.messages, [
     { role: "user", label: "你", text: "检查状态" },
     { role: "assistant", label: "Codex", text: "正在检查。" },
-    { role: "activity", label: "已运行命令", text: "git status --short" },
+    {
+      role: "activityGroup",
+      id: "activity-group-0-2",
+      label: "执行过程",
+      count: 1,
+      summary: "命令 1",
+      latest: { label: "已运行命令", text: "git status --short" },
+      hasProblem: false,
+      items: [{ role: "activity", activityType: "command", label: "已运行命令", text: "git status --short", hasProblem: false }],
+    },
   ]);
   assert.deepEqual(transcript.automationEvents, []);
 });
@@ -33,9 +42,64 @@ test("renders commentary progress without confusing it with the final answer", (
   });
 
   assert.deepEqual(transcript.messages, [
-    { role: "activity", label: "Codex 正在执行", text: "正在读取文件。" },
+    {
+      role: "activityGroup",
+      id: "activity-group-0-0",
+      label: "执行过程",
+      count: 1,
+      summary: "进度 1",
+      latest: { label: "Codex 正在执行", text: "正在读取文件。" },
+      hasProblem: false,
+      items: [{ role: "activity", activityType: "progress", label: "Codex 正在执行", text: "正在读取文件。" }],
+    },
     { role: "assistant", label: "Codex", text: "读取完成。" },
   ]);
+});
+
+test("groups consecutive execution activity without crossing a final answer or turn", () => {
+  const transcript = toTranscript({
+    turns: [
+      {
+        items: [
+          { type: "commandExecution", command: "npm test" },
+          { type: "fileChange", changes: [{ path: "src/public/app.js" }] },
+          { type: "browserAction", url: "http://127.0.0.1:8787" },
+          { type: "agentMessage", phase: "final", text: "第一段完成。" },
+          { type: "toolCall", toolName: "web.run" },
+        ],
+      },
+      { items: [{ type: "commandExecution", command: "git status --short" }] },
+    ],
+  });
+
+  assert.equal(transcript.messages.length, 4);
+  assert.deepEqual(transcript.messages[0], {
+    role: "activityGroup",
+    id: "activity-group-0-0",
+    label: "执行过程",
+    count: 3,
+    summary: "命令 1 · 文件 1 · 浏览器 1",
+    latest: { label: "正在使用浏览器", text: "http://127.0.0.1:8787" },
+    hasProblem: false,
+    items: [
+      { role: "activity", activityType: "command", label: "已运行命令", text: "npm test", hasProblem: false },
+      { role: "activity", activityType: "file", label: "已编辑文件", text: "src/public/app.js", hasProblem: false },
+      { role: "activity", activityType: "browser", label: "正在使用浏览器", text: "http://127.0.0.1:8787", hasProblem: false },
+    ],
+  });
+  assert.deepEqual(transcript.messages[1], { role: "assistant", label: "Codex", text: "第一段完成。" });
+  assert.equal(transcript.messages[2].id, "activity-group-0-4");
+  assert.equal(transcript.messages[3].id, "activity-group-1-5");
+});
+
+test("marks failed execution groups so the UI can keep them expanded", () => {
+  const transcript = toTranscript({
+    turns: [{ items: [{ type: "commandExecution", status: "failed", command: "npm test" }] }],
+  });
+
+  assert.equal(transcript.messages[0].role, "activityGroup");
+  assert.equal(transcript.messages[0].hasProblem, true);
+  assert.equal(transcript.messages[0].items[0].hasProblem, true);
 });
 
 test("moves exact heartbeat envelopes into the automation audit trail", () => {

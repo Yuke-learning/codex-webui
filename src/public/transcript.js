@@ -7,7 +7,14 @@ export function toTranscript(thread) {
   const automationEvents = [];
   let rawIndex = 0;
 
-  for (const turn of thread?.turns ?? []) {
+  for (const [turnIndex, turn] of (thread?.turns ?? []).entries()) {
+    const pendingActivities = [];
+    const flushActivities = () => {
+      if (!pendingActivities.length) return;
+      messages.push(activityGroupFrom(pendingActivities, turnIndex));
+      pendingActivities.length = 0;
+    };
+
     for (const item of turn?.items ?? []) {
       const normalized = normalizeTranscriptItem(item);
       if (!normalized) {
@@ -16,12 +23,17 @@ export function toTranscript(thread) {
       }
 
       if (normalized.kind === "automation") {
+        flushActivities();
         appendAutomationEvent(automationEvents, normalized.event, rawIndex);
+      } else if (normalized.message.role === "activity") {
+        pendingActivities.push({ ...normalized.message, rawIndex });
       } else {
+        flushActivities();
         messages.push(normalized.message);
       }
       rawIndex += 1;
     }
+    flushActivities();
   }
 
   return { messages, automationEvents };
@@ -70,15 +82,66 @@ function messageFromItem(item) {
     const text = nonEmptyText(item.text);
     if (!text) return null;
     const isCommentary = String(item.phase ?? "").toLowerCase() === "commentary";
-    return isCommentary ? { role: "activity", label: "Codex 正在执行", text } : { role: "assistant", label: "Codex", text };
+    return isCommentary
+      ? { role: "activity", activityType: "progress", label: "Codex 正在执行", text }
+      : { role: "assistant", label: "Codex", text };
   }
 
   if (item.type === "reasoning") return null;
 
   const activity = describeItemActivity(item);
-  if (activity) return { role: "activity", label: activity.title, text: activity.detail };
+  if (activity) {
+    return {
+      role: "activity",
+      activityType: activityTypeFor(item),
+      label: activity.title,
+      text: activity.detail,
+      hasProblem: hasProblemStatus(item.status),
+    };
+  }
 
   return null;
+}
+
+function activityGroupFrom(items, turnIndex) {
+  const counts = new Map();
+  for (const item of items) counts.set(item.activityType, (counts.get(item.activityType) ?? 0) + 1);
+
+  const latest = items.at(-1);
+  return {
+    role: "activityGroup",
+    id: `activity-group-${turnIndex}-${items[0].rawIndex}`,
+    label: "执行过程",
+    count: items.length,
+    summary: [...counts.entries()].map(([type, count]) => `${activityTypeLabel(type)} ${count}`).join(" · "),
+    latest: { label: latest.label, text: latest.text },
+    hasProblem: items.some((item) => item.hasProblem),
+    items: items.map(({ rawIndex, ...item }) => item),
+  };
+}
+
+function activityTypeFor(item) {
+  const type = String(item?.type ?? "").toLowerCase();
+  if (type === "commandexecution") return "command";
+  if (type === "filechange" || type === "filechangeproposal") return "file";
+  if (type.includes("browser") || type.includes("websearch")) return "browser";
+  if (type.includes("mcp") || type.includes("toolcall")) return "tool";
+  return "progress";
+}
+
+function activityTypeLabel(type) {
+  return {
+    command: "命令",
+    file: "文件",
+    browser: "浏览器",
+    tool: "工具",
+    progress: "进度",
+  }[type] ?? "活动";
+}
+
+function hasProblemStatus(status) {
+  const value = typeof status === "string" ? status : status?.status ?? status?.type ?? "";
+  return /cancelled|canceled|denied|error|failed|interrupted|rejected/i.test(String(value));
 }
 
 function textParts(content) {
