@@ -11,6 +11,10 @@
     "build": "node scripts/build-client.mjs",
     "dev": "npm run build && node server.mjs",
     "start": "npm run build && node server.mjs",
+    "service:install": "node scripts/launchd-service.mjs install",
+    "service:restart": "node scripts/launchd-service.mjs restart",
+    "service:status": "node scripts/launchd-service.mjs status",
+    "service:uninstall": "node scripts/launchd-service.mjs uninstall",
     "test": "npm run build && node --test"
   },
   "dependencies": {

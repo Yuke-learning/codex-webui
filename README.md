@@ -21,6 +21,28 @@ codex app-server daemon bootstrap --remote-control
 npm run dev
 ```
 
+## macOS 常驻运行（推荐）
+
+不要把 `npm run dev` 的临时终端当作远程访问所依赖的长期服务。安装用户级 LaunchAgent 后，WebUI 会在登录时自动启动，异常退出后由 `launchd` 自动拉起：
+
+```bash
+# 安装或更新配置，并立即启动
+npm run service:install
+
+# 查看 launchd 状态
+npm run service:status
+
+# 代码更新后重启；启动时会自动重新构建前端
+npm run service:restart
+
+# 不再需要常驻服务时卸载
+npm run service:uninstall
+```
+
+安装过程不需要 `sudo`，不会复制 Codex 或 Tailscale 凭据。生成的配置位于 `~/Library/LaunchAgents/com.yuke.codex-webui.plist`；日志写入仓库中已被 Git 忽略的 `logs/` 目录，并使用仅当前用户可访问的权限。LaunchAgent 固定监听 `127.0.0.1:8787`，外部访问仍只经过 Tailscale Serve。
+
+配置会记录安装时解析到的稳定 Node.js、Codex CLI 和 Tailscale 二进制路径。升级或移动这些运行时后，重新执行一次 `npm run service:install`。
+
 安装器管理的 standalone CLI 可运行：
 
 ```bash
@@ -64,6 +86,7 @@ TAILSCALE_BIN=/usr/local/bin/tailscale npm run dev
 - 从 app-server 动态读取可用模型与推理强度；详情页显示线程的实际设置，并可将新的模型/强度应用于后续 turn。
 - SSE 事件按影响范围处理：目标和 token 使用量等未展示事件不会触发重绘；仅当前线程完成、压缩或设置变更才刷新详情。
 - Tailscale 连接与 Serve 入口持续监控；状态变化通过 SSE 实时同步到页面，健康接口只返回本机连接和当前 WebUI 入口，不暴露 tailnet 中的其他设备列表。
+- 提供 macOS 用户级 `launchd` 常驻部署：登录启动、异常自动恢复、直接使用稳定 Node 入口，并避免依赖 Codex 临时终端生命周期。
 - 优先 `codex app-server proxy`、自动回退到直接 `codex app-server --stdio` 的 JSON-RPC adapter，支持 JSONL 与 `Content-Length` 帧。
 - loopback 默认监听、同源写请求检查、请求大小限制、内容安全策略（CSP）与安全的 `.gitignore`。
 
