@@ -157,6 +157,10 @@ button { cursor: pointer; }
 .empty-state h1 { margin: 8px 0; font-size: clamp(25px, 4vw, 38px); letter-spacing: -.04em; }
 .empty-state > p:not(.eyebrow) { margin: 0 auto 22px; color: var(--muted); line-height: 1.65; }
 .thread-view { min-height: 0; overflow-y: auto; overscroll-behavior: contain; padding: 28px clamp(18px, 6vw, 110px); }
+.history-loader { display: flex; justify-content: center; max-width: 880px; margin: 0 auto 14px; }
+.history-loader button { min-height: 36px; border: 1px solid var(--line); border-radius: 18px; padding: 6px 13px; background: var(--panel); color: var(--muted); font-size: 12px; }
+.history-loader button:hover:not(:disabled) { border-color: var(--accent); color: var(--text); }
+.history-loader button:disabled { cursor: wait; opacity: .74; }
 .messages { display: flex; flex-direction: column; gap: 20px; max-width: 880px; margin: 0 auto; }
 .message { padding: 15px 17px; border: 1px solid var(--line); border-radius: 13px; line-height: 1.6; overflow-wrap: anywhere; }
 .message.user { align-self: flex-end; max-width: 80%; background: var(--user); }

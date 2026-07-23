@@ -8,11 +8,13 @@ import {
   saveMessageTimeVisibility,
 } from "./preferences.js";
 import { appendRichContent } from "./rich-content.js";
+import { mergeRecentTurns, prependOlderTurns } from "./thread-history.js";
 import { toTranscript, transcriptSignature } from "./transcript.js";
 import { parseCodexUiSegments } from "./ui-directives.js";
 
 const RICH_MESSAGE_ROLES = new Set(["user", "assistant"]);
 const MAX_RICH_MESSAGE_LENGTH = 100_000;
+const THREAD_CACHE_LIMIT = 12;
 
 const THEME_IDS = new Set([
   "default",
@@ -40,11 +42,16 @@ const state = {
   detailRefreshTimer: null,
   runningRefreshTimer: null,
   detailRefreshInFlight: null,
+  detailAbortController: null,
+  historyAbortController: null,
+  historyLoading: false,
   fullSyncInFlight: false,
   liveActivity: null,
   listRequestId: 0,
   detailRequestId: 0,
   renderedThreadSignature: null,
+  renderedMessageSignatures: null,
+  threadCache: new Map(),
   activeView: "console",
   theme: loadThemePreference(),
   showCcSwitch: loadCcSwitchVisibility(),
@@ -80,6 +87,7 @@ const elements = {
   installProviderPortable: $("#install-provider-portable"),
   empty: $("#empty-state"),
   view: $("#thread-view"),
+  historyLoader: $("#history-loader"),
   messages: $("#messages"),
   liveActivity: $("#live-activity"),
   liveActivityTitle: $("#live-activity-title"),
@@ -488,6 +496,8 @@ function threadRow(thread) {
   const button = document.createElement("button");
   button.className = `thread-row${thread.id === state.selectedId ? " selected" : ""}`;
   button.type = "button";
+  button.dataset.threadId = thread.id;
+  button.setAttribute("aria-current", thread.id === state.selectedId ? "page" : "false");
   button.title = thread.cwd || "";
   button.addEventListener("click", () => selectThread(thread.id));
 
@@ -510,42 +520,121 @@ async function selectThread(threadId, { follow = true } = {}) {
   if (isNewSelection) {
     stopRunningRefresh();
     state.liveActivity = null;
+    state.historyAbortController?.abort();
+    state.historyAbortController = null;
+    state.historyLoading = false;
   }
   state.selectedId = threadId;
   setMobileSidebar(false);
-  const requestId = ++state.detailRequestId;
-  renderThreadList();
-  if (isNewSelection) elements.messages.replaceChildren(messageNode("正在加载对话…", "tool", "状态"));
+  setSelectedThreadRow(threadId);
+  const cached = state.threadCache.get(threadId)?.thread;
+  if (isNewSelection) {
+    resetRenderedTranscript();
+    if (cached) {
+      state.selectedThread = cached;
+      renderSelectedThread({ follow: false });
+    } else {
+      showThreadLoading(threadId);
+    }
+  }
+
+  const { requestId, controller } = beginDetailRequest();
   try {
-    const payload = await api(`/api/threads/${encodeURIComponent(threadId)}`);
+    const payload = await api(`/api/threads/${encodeURIComponent(threadId)}`, { signal: controller.signal });
     if (requestId !== state.detailRequestId || threadId !== state.selectedId) return;
-    state.selectedThread = payload.thread;
-    state.renderedThreadSignature = null;
+    state.selectedThread = mergeThreadWithCachedTurns(payload.thread, state.selectedThread);
+    cacheThread(state.selectedThread);
     renderSelectedThread({ follow });
   } catch (error) {
+    if (isAbortError(error)) return;
     showToast(error.message, "error");
+  } finally {
+    endDetailRequest(controller);
   }
 }
 
 async function refreshSelectedThread({ follow = false, force = false, throwOnError = false } = {}) {
   const threadId = state.selectedId;
-  if (!threadId || (!force && state.detailRefreshInFlight)) return false;
+  if (!threadId || (!force && (state.detailRefreshInFlight || state.detailAbortController))) return false;
   const refreshToken = { threadId };
   state.detailRefreshInFlight = refreshToken;
-  const requestId = ++state.detailRequestId;
+  const { requestId, controller } = beginDetailRequest();
 
   try {
-    const payload = await api(`/api/threads/${encodeURIComponent(threadId)}`);
+    const payload = await api(`/api/threads/${encodeURIComponent(threadId)}`, { signal: controller.signal });
     if (requestId !== state.detailRequestId || threadId !== state.selectedId) return false;
-    state.selectedThread = payload.thread;
+    state.selectedThread = mergeThreadWithCachedTurns(payload.thread, state.selectedThread);
+    cacheThread(state.selectedThread);
     renderSelectedThread({ follow });
     return true;
   } catch (error) {
+    if (isAbortError(error)) return false;
     if (throwOnError) throw error;
     console.warn(error);
     return false;
   } finally {
+    endDetailRequest(controller);
     if (state.detailRefreshInFlight === refreshToken) state.detailRefreshInFlight = null;
+  }
+}
+
+function beginDetailRequest() {
+  state.detailAbortController?.abort();
+  const controller = new AbortController();
+  state.detailAbortController = controller;
+  return { requestId: ++state.detailRequestId, controller };
+}
+
+function endDetailRequest(controller) {
+  if (state.detailAbortController === controller) state.detailAbortController = null;
+}
+
+function isAbortError(error) {
+  return error?.name === "AbortError";
+}
+
+function cacheThread(thread) {
+  if (!thread?.id) return;
+  state.threadCache.delete(thread.id);
+  state.threadCache.set(thread.id, { thread, cachedAt: Date.now() });
+  while (state.threadCache.size > THREAD_CACHE_LIMIT) {
+    state.threadCache.delete(state.threadCache.keys().next().value);
+  }
+}
+
+function mergeThreadWithCachedTurns(incoming, current) {
+  if (!incoming?.id || incoming.id !== current?.id) return incoming;
+  const currentTurns = current.turns ?? [];
+  const recentTurns = incoming.turns ?? [];
+  const keepOlderCursor = currentTurns.length > recentTurns.length && current.history?.nextCursor;
+  return {
+    ...incoming,
+    turns: mergeRecentTurns(currentTurns, recentTurns),
+    history: keepOlderCursor ? current.history : incoming.history,
+  };
+}
+
+function showThreadLoading(threadId) {
+  const summary = state.threads.find((thread) => thread.id === threadId);
+  state.selectedThread = null;
+  elements.empty.classList.add("hidden");
+  elements.header.classList.add("hidden");
+  elements.view.classList.remove("hidden");
+  elements.composer.classList.add("hidden");
+  elements.historyLoader.classList.add("hidden");
+  elements.messages.replaceChildren(messageNode(`正在加载${summary ? `“${threadTitle(summary)}”` : "对话"}…`, "tool", "状态"));
+}
+
+function resetRenderedTranscript() {
+  state.renderedThreadSignature = null;
+  state.renderedMessageSignatures = null;
+}
+
+function setSelectedThreadRow(threadId) {
+  for (const row of elements.list.querySelectorAll(".thread-row")) {
+    const selected = row.dataset.threadId === threadId;
+    row.classList.toggle("selected", selected);
+    row.setAttribute("aria-current", selected ? "page" : "false");
   }
 }
 
@@ -563,6 +652,7 @@ function renderSelectedThread({ follow = false } = {}) {
   elements.turnStatus.textContent = busy ? state.liveActivity?.title ?? "Codex 正在执行" : "准备就绪";
   elements.interrupt.disabled = !busy;
   renderThreadSettings(thread);
+  renderHistoryLoader(thread);
   renderMessages(thread, { follow });
   renderLiveActivity(thread);
 }
@@ -704,21 +794,94 @@ function renderMessages(thread, { follow = false } = {}) {
   const signature = transcriptSignature(transcript);
   if (signature === state.renderedThreadSignature) return;
   const shouldFollow = follow || isNearBottom(elements.view);
-  elements.messages.replaceChildren();
+  const messageSignatures = transcript.messages.map(transcriptMessageSignature);
+  const previous = state.renderedMessageSignatures;
+  let sharedPrefix = 0;
+  if (Array.isArray(previous) && elements.messages.children.length === previous.length) {
+    const limit = Math.min(previous.length, messageSignatures.length);
+    while (sharedPrefix < limit && previous[sharedPrefix] === messageSignatures[sharedPrefix]) sharedPrefix += 1;
+  }
+
   if (!transcript.messages.length) {
+    elements.messages.replaceChildren();
     const empty = document.createElement("p");
     empty.className = "empty-messages";
     empty.textContent = "这个线程还没有可显示的消息。发送第一条指令开始吧。";
     elements.messages.append(empty);
-  }
-  for (const message of transcript.messages) {
-    elements.messages.append(message.role === "activityGroup"
-      ? activityGroupNode(message)
-      : messageNode(message.text, message.role, message.label, message.timestamp));
+    state.renderedMessageSignatures = [];
+  } else {
+    if (!Array.isArray(previous) || elements.messages.children.length !== previous.length) sharedPrefix = 0;
+    while (elements.messages.children.length > sharedPrefix) elements.messages.lastElementChild.remove();
+    for (let index = sharedPrefix; index < transcript.messages.length; index += 1) {
+      const message = transcript.messages[index];
+      elements.messages.append(message.role === "activityGroup"
+        ? activityGroupNode(message)
+        : messageNode(message.text, message.role, message.label, message.timestamp));
+    }
+    state.renderedMessageSignatures = messageSignatures;
   }
   renderAutomationEvents(transcript.automationEvents);
   state.renderedThreadSignature = signature;
   if (shouldFollow) elements.view.scrollTop = elements.view.scrollHeight;
+}
+
+function transcriptMessageSignature(message) {
+  return JSON.stringify(message);
+}
+
+function renderHistoryLoader(thread) {
+  const hasMore = Boolean(thread?.history?.nextCursor);
+  elements.historyLoader.replaceChildren();
+  elements.historyLoader.classList.toggle("hidden", !hasMore);
+  if (!hasMore) return;
+
+  const button = document.createElement("button");
+  button.type = "button";
+  button.disabled = state.historyLoading;
+  button.textContent = state.historyLoading
+    ? "正在加载更早的对话…"
+    : `加载更早的对话（已加载 ${thread.turns?.length ?? 0} 轮）`;
+  button.addEventListener("click", loadOlderTurns);
+  elements.historyLoader.append(button);
+}
+
+async function loadOlderTurns() {
+  const thread = state.selectedThread;
+  const cursor = thread?.history?.nextCursor;
+  if (!thread?.id || !cursor || state.historyLoading) return;
+
+  const threadId = thread.id;
+  const scrollTop = elements.view.scrollTop;
+  const scrollHeight = elements.view.scrollHeight;
+  const controller = new AbortController();
+  state.historyAbortController?.abort();
+  state.historyAbortController = controller;
+  state.historyLoading = true;
+  renderHistoryLoader(thread);
+
+  try {
+    const payload = await api(`/api/threads/${encodeURIComponent(threadId)}/turns?cursor=${encodeURIComponent(cursor)}`, {
+      signal: controller.signal,
+    });
+    if (state.selectedId !== threadId || state.selectedThread !== thread) return;
+    state.selectedThread = {
+      ...thread,
+      turns: prependOlderTurns(thread.turns, payload.data),
+      history: { ...thread.history, nextCursor: payload.nextCursor ?? null, hasMore: Boolean(payload.nextCursor) },
+    };
+    cacheThread(state.selectedThread);
+    resetRenderedTranscript();
+    renderSelectedThread({ follow: false });
+    elements.view.scrollTop = scrollTop + (elements.view.scrollHeight - scrollHeight);
+  } catch (error) {
+    if (!isAbortError(error)) showToast(`加载历史对话失败：${error.message}`, "error");
+  } finally {
+    if (state.historyAbortController === controller) state.historyAbortController = null;
+    if (state.selectedId === threadId) {
+      state.historyLoading = false;
+      renderHistoryLoader(state.selectedThread);
+    }
+  }
 }
 
 function setLiveActivity(threadId, activity, { running = true } = {}) {
@@ -1330,12 +1493,17 @@ $("#delete-thread").addEventListener("click", async () => {
 function clearSelection() {
   stopRunningRefresh();
   clearTimeout(state.detailRefreshTimer);
+  state.detailAbortController?.abort();
+  state.detailAbortController = null;
+  state.historyAbortController?.abort();
+  state.historyAbortController = null;
+  state.historyLoading = false;
   state.detailRequestId += 1;
   state.detailRefreshInFlight = null;
   state.selectedId = null;
   state.selectedThread = null;
   state.liveActivity = null;
-  state.renderedThreadSignature = null;
+  resetRenderedTranscript();
   if (state.activeView === "console") {
     elements.header.classList.add("hidden");
     elements.view.classList.add("hidden");

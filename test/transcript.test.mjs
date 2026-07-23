@@ -120,6 +120,14 @@ test("marks failed execution groups so the UI can keep them expanded", () => {
   assert.equal(transcript.messages[0].items[0].hasProblem, true);
 });
 
+test("uses the stable turn id for activity expansion state across pagination", () => {
+  const transcript = toTranscript({
+    turns: [{ id: "turn-stable", items: [{ type: "commandExecution", command: "npm test" }] }],
+  });
+
+  assert.equal(transcript.messages[0].id, "activity-group-turn-stable-0");
+});
+
 test("moves exact heartbeat envelopes into the automation audit trail", () => {
   const heartbeat = `<heartbeat>\n  <automation_id>simgr</automation_id>\n  <decision>NOTIFY</decision>\n  <message>训练正常。</message>\n</heartbeat>`;
   const transcript = toTranscript({

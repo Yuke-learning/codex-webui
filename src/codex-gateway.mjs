@@ -3,6 +3,9 @@ import path from "node:path";
 
 import { CodexRpcClient, CodexRpcError } from "./codex-rpc.mjs";
 
+const INITIAL_TURNS_LIMIT = 8;
+const OLDER_TURNS_LIMIT = 12;
+
 export class InputError extends Error {
   constructor(message, status = 400) {
     super(message);
@@ -79,20 +82,77 @@ export class CodexGateway extends EventEmitter {
   }
 
   async readThread(threadId) {
+    return (await this.readThreadWithTiming(threadId)).thread;
+  }
+
+  async readThreadWithTiming(threadId) {
     assertThreadId(threadId);
+    const startedAt = performance.now();
+
+    try {
+      const resume = await this.#request("thread/resume", {
+        threadId,
+        // `initialTurnsPage` alone still makes app-server serialize the full
+        // thread in `resume.thread`.  Keep the base thread lightweight and
+        // request only the explicitly paged recent turns.
+        excludeTurns: true,
+        initialTurnsPage: {
+          itemsView: "full",
+          limit: INITIAL_TURNS_LIMIT,
+          sortDirection: "desc",
+        },
+      });
+      if (resume.initialTurnsPage) {
+        return {
+          thread: this.#threadFromResume(threadId, resume, resume.initialTurnsPage),
+          timing: {
+            codexMs: performance.now() - startedAt,
+            mode: "recent-turns-page",
+          },
+        };
+      }
+    } catch (error) {
+      // Older app-server builds did not support initialTurnsPage.  The legacy
+      // path below keeps this WebUI usable while newer builds take the faster
+      // single-request route.
+      if (!(error instanceof CodexRpcError)) throw error;
+    }
+
     const resume = await this.#request("thread/resume", { threadId, excludeTurns: true });
     const result = await this.#request("thread/read", { threadId, includeTurns: true });
-    const thread = {
-      ...result.thread,
-      settings: {
-        model: resume.model,
-        effort: resume.reasoningEffort,
+    return {
+      thread: this.#finalizeThread(threadId, {
+        ...result.thread,
+        settings: {
+          model: resume.model,
+          effort: resume.reasoningEffort,
+        },
+        history: { nextCursor: null, hasMore: false, mode: "full-legacy" },
+      }),
+      timing: {
+        codexMs: performance.now() - startedAt,
+        mode: "full-legacy",
       },
     };
-    if (isThreadRunning(thread.status)) this.#runningThreads.add(threadId);
-    else this.#runningThreads.delete(threadId);
-    if (this.#activeTurns.has(threadId) && !isThreadRunning(thread.status)) thread.status = "running";
-    return thread;
+  }
+
+  async listThreadTurns(threadId, { cursor, limit = OLDER_TURNS_LIMIT } = {}) {
+    assertThreadId(threadId);
+    const safeCursor = optionalCursor(cursor);
+    const safeLimit = boundedLimit(limit, OLDER_TURNS_LIMIT);
+    const startedAt = performance.now();
+    const page = await this.#request("thread/turns/list", {
+      threadId,
+      ...(safeCursor ? { cursor: safeCursor } : {}),
+      itemsView: "full",
+      limit: safeLimit,
+      sortDirection: "desc",
+    });
+    const normalized = normalizeTurnsPage(page);
+    return {
+      ...normalized,
+      timing: { codexMs: performance.now() - startedAt, mode: "older-turns-page" },
+    };
   }
 
   async createThread({ cwd, model, effort } = {}) {
@@ -208,6 +268,30 @@ export class CodexGateway extends EventEmitter {
     this.#client = null;
     this.#connecting = null;
     this.#transport = null;
+  }
+
+  #threadFromResume(threadId, resume, page) {
+    const turns = normalizeTurnsPage(page);
+    return this.#finalizeThread(threadId, {
+      ...resume.thread,
+      turns: turns.data,
+      settings: {
+        model: resume.model,
+        effort: resume.reasoningEffort,
+      },
+      history: {
+        nextCursor: turns.nextCursor,
+        hasMore: Boolean(turns.nextCursor),
+        mode: "recent-turns-page",
+      },
+    });
+  }
+
+  #finalizeThread(threadId, thread) {
+    if (isThreadRunning(thread.status)) this.#runningThreads.add(threadId);
+    else this.#runningThreads.delete(threadId);
+    if (this.#activeTurns.has(threadId) && !isThreadRunning(thread.status)) thread.status = "running";
+    return thread;
   }
 
   async #request(method, params) {
@@ -334,6 +418,19 @@ function optionalText(value) {
   return typeof value === "string" && value.trim() ? value.trim() : undefined;
 }
 
+function optionalCursor(value) {
+  if (value === undefined || value === null || value === "") return undefined;
+  if (typeof value !== "string" || value.length > 4_096) throw new InputError("Invalid thread page cursor.");
+  return value;
+}
+
+function boundedLimit(value, fallback) {
+  if (value === undefined || value === null || value === "") return fallback;
+  const limit = Number.parseInt(String(value), 10);
+  if (!Number.isSafeInteger(limit) || limit < 1 || limit > 100) throw new InputError("Thread page limit must be between 1 and 100.");
+  return limit;
+}
+
 function isThreadRunning(status) {
   if (typeof status === "string") return ["running", "active"].includes(status);
   return status?.type === "running" || status?.status === "running";
@@ -361,6 +458,14 @@ export async function collectPaginatedThreadData(fetchPage) {
   } while (cursor);
 
   return threads;
+}
+
+export function normalizeTurnsPage(page) {
+  const data = Array.isArray(page?.data) ? [...page.data].reverse() : [];
+  return {
+    data,
+    nextCursor: optionalText(page?.nextCursor) ?? null,
+  };
 }
 
 function toThreadSummary(thread) {

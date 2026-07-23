@@ -4,6 +4,7 @@ import { createServer } from "node:http";
 import path from "node:path";
 import process from "node:process";
 import { fileURLToPath } from "node:url";
+import { brotliCompressSync, constants as zlibConstants, gzipSync } from "node:zlib";
 
 import { CcSwitchAdapter } from "./src/cc-switch-adapter.mjs";
 import { PortableCcSwitchInstaller } from "./src/cc-switch-portable.mjs";
@@ -84,6 +85,8 @@ function broadcast(event, data) {
 
 async function handleApi(request, response, url) {
   response.setHeader("Cache-Control", "no-store");
+  response.setHeader("Vary", "Accept-Encoding");
+  response.__webuiAcceptEncoding = request.headers["accept-encoding"] ?? "";
   const { pathname } = url;
 
   if (request.method === "GET" && pathname === "/api/health") {
@@ -166,7 +169,7 @@ async function handleApi(request, response, url) {
     return;
   }
 
-  const match = /^\/api\/threads\/([^/]+)(?:\/(messages|interrupt|archive|settings))?$/.exec(pathname);
+  const match = /^\/api\/threads\/([^/]+)(?:\/(messages|interrupt|archive|settings|turns))?$/.exec(pathname);
   if (!match) {
     respondJson(response, 404, { error: "Not found" });
     return;
@@ -176,7 +179,19 @@ async function handleApi(request, response, url) {
   const action = match[2];
 
   if (request.method === "GET" && !action) {
-    respondJson(response, 200, { thread: await gateway.readThread(threadId) });
+    const result = await gateway.readThreadWithTiming(threadId);
+    setThreadTimingHeader(response, result.timing);
+    respondJson(response, 200, { thread: result.thread });
+    return;
+  }
+
+  if (request.method === "GET" && action === "turns") {
+    const result = await gateway.listThreadTurns(threadId, {
+      cursor: url.searchParams.get("cursor") ?? undefined,
+      limit: url.searchParams.get("limit") ?? undefined,
+    });
+    setThreadTimingHeader(response, result.timing);
+    respondJson(response, 200, { data: result.data, nextCursor: result.nextCursor, hasMore: Boolean(result.nextCursor) });
     return;
   }
 
@@ -304,13 +319,43 @@ function respondJson(response, status, payload = undefined) {
     response.end();
     return;
   }
-  const body = JSON.stringify(payload);
+  const json = JSON.stringify(payload);
+  const body = Buffer.from(json);
+  const encoding = selectCompression(response.__webuiAcceptEncoding, body.length);
+  const compressed = encoding === "br"
+    ? brotliCompressSync(body, { params: { [zlibConstants.BROTLI_PARAM_QUALITY]: 4 } })
+    : encoding === "gzip"
+      ? gzipSync(body, { level: 6 })
+      : body;
   response.writeHead(status, {
     "Content-Type": "application/json; charset=utf-8",
-    "Content-Length": Buffer.byteLength(body),
+    "Content-Length": compressed.length,
+    ...(encoding ? { "Content-Encoding": encoding } : {}),
     "X-Content-Type-Options": "nosniff",
   });
-  response.end(body);
+  response.end(compressed);
+}
+
+function setThreadTimingHeader(response, timing) {
+  const duration = Math.max(0, Number(timing?.codexMs ?? 0)).toFixed(1);
+  response.setHeader("Server-Timing", `codex;dur=${duration};desc=\"${timing?.mode ?? "thread"}\"`);
+  response.setHeader("X-WebUI-Thread-Mode", timing?.mode ?? "thread");
+}
+
+function selectCompression(acceptEncoding, size) {
+  if (size < 1_024) return null;
+  if (acceptsEncoding(acceptEncoding, "br")) return "br";
+  if (acceptsEncoding(acceptEncoding, "gzip")) return "gzip";
+  return null;
+}
+
+function acceptsEncoding(header, encoding) {
+  return String(header).split(",").some((entry) => {
+    const [name, ...parameters] = entry.trim().toLowerCase().split(";");
+    if (name !== encoding && name !== "*") return false;
+    const quality = parameters.find((parameter) => parameter.trim().startsWith("q="));
+    return !quality || Number.parseFloat(quality.trim().slice(2)) > 0;
+  });
 }
 
 function respondError(response, error) {

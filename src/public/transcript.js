@@ -8,10 +8,11 @@ export function toTranscript(thread) {
   let rawIndex = 0;
 
   for (const [turnIndex, turn] of (thread?.turns ?? []).entries()) {
+    const turnKey = typeof turn?.id === "string" && turn.id ? turn.id : turnIndex;
     const pendingActivities = [];
     const flushActivities = () => {
       if (!pendingActivities.length) return;
-      messages.push(activityGroupFrom(pendingActivities, turnIndex));
+      messages.push(activityGroupFrom(pendingActivities, turnKey));
       pendingActivities.length = 0;
     };
 
@@ -114,14 +115,14 @@ function withTurnTimestamp(message, turn) {
   return Number.isFinite(timestamp) && timestamp > 0 ? { ...message, timestamp } : message;
 }
 
-function activityGroupFrom(items, turnIndex) {
+function activityGroupFrom(items, turnKey) {
   const counts = new Map();
   for (const item of items) counts.set(item.activityType, (counts.get(item.activityType) ?? 0) + 1);
 
   const latest = items.at(-1);
   return {
     role: "activityGroup",
-    id: `activity-group-${turnIndex}-${items[0].rawIndex}`,
+    id: `activity-group-${turnKey}-${items[0].rawIndex}`,
     label: "执行过程",
     count: items.length,
     summary: [...counts.entries()].map(([type, count]) => `${activityTypeLabel(type)} ${count}`).join(" · "),

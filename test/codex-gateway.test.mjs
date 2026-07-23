@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 
-import { collectPaginatedThreadData } from "../src/codex-gateway.mjs";
+import { collectPaginatedThreadData, normalizeTurnsPage } from "../src/codex-gateway.mjs";
 
 test("collects every thread/list page and removes overlapping thread ids", async () => {
   const cursors = [];
@@ -28,4 +28,16 @@ test("rejects a repeated thread/list pagination cursor", async () => {
     collectPaginatedThreadData(async () => ({ data: [], nextCursor: "same-page" })),
     /repeated pagination cursor/i,
   );
+});
+
+test("normalizes descending turn pages into chronological order", () => {
+  const page = normalizeTurnsPage({
+    data: [{ id: "newest" }, { id: "older" }],
+    nextCursor: "older-page",
+  });
+
+  assert.deepEqual(page, {
+    data: [{ id: "older" }, { id: "newest" }],
+    nextCursor: "older-page",
+  });
 });
